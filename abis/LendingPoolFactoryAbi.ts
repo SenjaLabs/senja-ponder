@@ -1,0 +1,168 @@
+export const LendingPoolFactoryAbi = [
+  {
+    inputs: [
+      { name: "_isHealthy", internalType: "address", type: "address" },
+      {
+        name: "_lendingPoolDeployer",
+        internalType: "address",
+        type: "address",
+      },
+      { name: "_protocol", internalType: "address", type: "address" },
+      { name: "_helper", internalType: "address", type: "address" },
+    ],
+    stateMutability: "nonpayable",
+    type: "constructor",
+  },
+  {
+    inputs: [
+      {
+        indexed: true,
+        name: "chainId",
+        internalType: "uint256",
+        type: "uint256",
+      },
+      {
+        indexed: true,
+        name: "basicTokenSender",
+        internalType: "address",
+        type: "address",
+      },
+    ],
+    name: "BasicTokenSenderAdded",
+    anonymous: false,
+    type: "event",
+  },
+  {
+    inputs: [
+      {
+        indexed: true,
+        name: "collateralToken",
+        internalType: "address",
+        type: "address",
+      },
+      {
+        indexed: true,
+        name: "borrowToken",
+        internalType: "address",
+        type: "address",
+      },
+      {
+        indexed: true,
+        name: "lendingPool",
+        internalType: "address",
+        type: "address",
+      },
+      { indexed: false, name: "ltv", internalType: "uint256", type: "uint256" },
+    ],
+    name: "LendingPoolCreated",
+    anonymous: false,
+    type: "event",
+  },
+  {
+    inputs: [
+      {
+        indexed: true,
+        name: "token",
+        internalType: "address",
+        type: "address",
+      },
+      {
+        indexed: true,
+        name: "dataStream",
+        internalType: "address",
+        type: "address",
+      },
+    ],
+    name: "TokenDataStreamAdded",
+    anonymous: false,
+    type: "event",
+  },
+  {
+    outputs: [],
+    inputs: [
+      { name: "_token", internalType: "address", type: "address" },
+      { name: "_dataStream", internalType: "address", type: "address" },
+    ],
+    name: "addTokenDataStream",
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    outputs: [{ name: "", internalType: "address", type: "address" }],
+    inputs: [{ name: "", internalType: "uint256", type: "uint256" }],
+    name: "basicTokenSender",
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    outputs: [{ name: "", internalType: "address", type: "address" }],
+    inputs: [
+      { name: "collateralToken", internalType: "address", type: "address" },
+      { name: "borrowToken", internalType: "address", type: "address" },
+      { name: "ltv", internalType: "uint256", type: "uint256" },
+    ],
+    name: "createLendingPool",
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    outputs: [{ name: "", internalType: "address", type: "address" }],
+    inputs: [],
+    name: "helper",
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    outputs: [{ name: "", internalType: "address", type: "address" }],
+    inputs: [],
+    name: "isHealthy",
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    outputs: [{ name: "", internalType: "address", type: "address" }],
+    inputs: [],
+    name: "lendingPoolDeployer",
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    outputs: [{ name: "", internalType: "address", type: "address" }],
+    inputs: [],
+    name: "owner",
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    outputs: [{ name: "", internalType: "uint256", type: "uint256" }],
+    inputs: [],
+    name: "poolCount",
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    outputs: [
+      { name: "collateralToken", internalType: "address", type: "address" },
+      { name: "borrowToken", internalType: "address", type: "address" },
+      { name: "lendingPoolAddress", internalType: "address", type: "address" },
+    ],
+    inputs: [{ name: "", internalType: "uint256", type: "uint256" }],
+    name: "pools",
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    outputs: [{ name: "", internalType: "address", type: "address" }],
+    inputs: [],
+    name: "protocol",
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    outputs: [{ name: "", internalType: "address", type: "address" }],
+    inputs: [{ name: "", internalType: "address", type: "address" }],
+    name: "tokenDataStream",
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;

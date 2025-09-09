@@ -1,0 +1,35 @@
+{
+  "name": "ponder-core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_ENV=development ponder dev",
+    "start": "NODE_ENV=production ponder start",
+    "start:local": "NODE_ENV=development ponder start",
+    "start:env": "dotenv -e .env.production -- ponder start",
+    "build": "pnpm run codegen",
+    "db": "ponder db",
+    "db:migrate": "dotenv -e .env.production -- ponder db",
+    "codegen": "ponder codegen",
+    "lint": "eslint .",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@types/pg": "^8.15.5",
+    "hono": "^4.5.0",
+    "pg": "^8.16.3",
+    "ponder": "^0.12.4",
+    "viem": "^2.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.9.0",
+    "dotenv-cli": "^10.0.0",
+    "eslint": "^8.53.0",
+    "eslint-config-ponder": "^0.12.4",
+    "typescript": "^5.2.2"
+  },
+  "engines": {
+    "node": ">=18.14"
+  }
+}
