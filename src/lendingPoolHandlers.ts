@@ -1,5 +1,13 @@
 import { ponder } from "ponder:registry";
 import * as schema from "../ponder.schema";
+import { 
+  PoolAnalytics, 
+  calculateUtilizationRate, 
+  calculateBorrowRate, 
+  calculateSupplyRate,
+  calculateAPY,
+  DEFAULT_INTEREST_MODEL 
+} from "./apyCalculator";
 
 // Helper functions
 function createEventID(blockNumber: bigint, logIndex: number): string {
@@ -25,6 +33,94 @@ async function getOrCreateUser(userAddress: string, context: any) {
   return user;
 }
 
+async function updatePoolAPY(
+  poolAddress: string, 
+  context: any, 
+  timestamp: bigint, 
+  blockNumber: bigint
+) {
+  const pool = await context.db.find(schema.LendingPool, { id: poolAddress });
+  if (!pool) return;
+
+  // Debug logging
+  console.log(`🔍 Updating APY for pool ${poolAddress}:`);
+  console.log(`   totalSupplyAssets: ${pool.totalSupplyAssets}`);
+  console.log(`   totalBorrowAssets: ${pool.totalBorrowAssets}`);
+  console.log(`   lastAccrued: ${pool.lastAccrued}`);
+  console.log(`   currentTimestamp: ${timestamp}`);
+
+  // Create analytics instance
+  const analytics = new PoolAnalytics(
+    pool.totalSupplyAssets,
+    pool.totalSupplyShares,
+    pool.totalBorrowAssets,
+    pool.totalBorrowShares,
+    pool.lastAccrued,
+    timestamp,
+    DEFAULT_INTEREST_MODEL
+  );
+
+  console.log(`   borrowRate: ${analytics.borrowRate}`);
+  console.log(`   supplyRate: ${analytics.supplyRate}`);
+  console.log(`   utilizationRate: ${analytics.utilizationRate}`);
+
+  // Calculate accrued interest
+  const accrual = analytics.calculateAccruedInterest();
+
+  // Update pool with new rates and accrued interest
+  await context.db.update(schema.LendingPool, { id: poolAddress })
+    .set({
+      totalSupplyAssets: accrual.newSupplyAssets,
+      totalBorrowAssets: accrual.newBorrowAssets,
+      utilizationRate: analytics.utilizationRate,
+      supplyRate: analytics.supplyRate,
+      borrowRate: analytics.borrowRate,
+      lastAccrued: timestamp,
+    });
+
+  // Create APY snapshot every hour (3600 seconds)
+  const hourlyTimestamp = timestamp - (timestamp % 3600n);
+  const snapshotId = `${poolAddress}-${hourlyTimestamp}`;
+  
+  // Check if snapshot already exists for this hour
+  const existingSnapshot = await context.db.find(schema.PoolAPYSnapshot, { id: snapshotId });
+  if (!existingSnapshot) {
+    await context.db.insert(schema.PoolAPYSnapshot).values({
+      id: snapshotId,
+      pool: poolAddress,
+      supplyAPY: analytics.supplyAPY,
+      borrowAPY: analytics.borrowAPY,
+      utilizationRate: analytics.utilizationRate,
+      totalSupplyAssets: accrual.newSupplyAssets,
+      totalBorrowAssets: accrual.newBorrowAssets,
+      timestamp: hourlyTimestamp,
+      blockNumber: blockNumber,
+    });
+  }
+
+  // Record interest accrual if significant
+  if (accrual.interestEarned > 0n) {
+    await context.db.insert(schema.InterestAccrual).values({
+      id: createEventID(blockNumber, 9999), // Use high log index for accrual events
+      pool: poolAddress,
+      previousSupplyAssets: pool.totalSupplyAssets,
+      newSupplyAssets: accrual.newSupplyAssets,
+      previousBorrowAssets: pool.totalBorrowAssets,
+      newBorrowAssets: accrual.newBorrowAssets,
+      interestEarned: accrual.interestEarned,
+      timestamp: timestamp,
+      blockNumber: blockNumber,
+      transactionHash: "0x0", // No specific transaction for accrual
+    });
+  }
+
+  console.log(`📊 APY Updated for pool ${poolAddress}:`);
+  console.log(`   Supply APY: ${analytics.supplyAPY / 100}%`);
+  console.log(`   Borrow APY: ${analytics.borrowAPY / 100}%`);
+  console.log(`   Utilization: ${analytics.utilizationRate / 100}%`);
+  console.log(`   Interest Earned: ${accrual.interestEarned.toString()}`);
+}
+
 async function getOrCreatePool(poolAddress: string, context: any) {
   let pool = await context.db.find(schema.LendingPool, { id: poolAddress });
   
@@ -40,6 +136,15 @@ async function getOrCreatePool(poolAddress: string, context: any) {
       totalBorrows: 0n,
       totalRepays: 0n,
       totalSwaps: 0n,
+      // APY tracking fields
+      totalSupplyAssets: 0n,
+      totalSupplyShares: 0n,
+      totalBorrowAssets: 0n,
+      totalBorrowShares: 0n,
+      utilizationRate: 0,
+      supplyRate: 0,
+      borrowRate: 0,
+      lastAccrued: 0n,
       created: 0n,
     });
     pool = await context.db.find(schema.LendingPool, { id: poolAddress });
@@ -67,11 +172,16 @@ ponder.on("LendingPool:SupplyLiquidity", async ({ event, context }) => {
       totalDeposited: user!.totalDeposited + BigInt(event.args.amount),
     });
   
-  // Update pool totals
+  // Update pool totals and assets/shares for APY calculation
   await context.db.update(schema.LendingPool, { id: poolAddress })
     .set({
       totalDeposits: pool!.totalDeposits + BigInt(event.args.amount),
+      totalSupplyAssets: pool!.totalSupplyAssets + BigInt(event.args.amount),
+      totalSupplyShares: pool!.totalSupplyShares + BigInt(event.args.shares),
     });
+
+  // Update APY calculations
+  await updatePoolAPY(poolAddress, context, BigInt(event.block.timestamp), BigInt(event.block.number));
 
   // Create SupplyLiquidity event record
   await context.db.insert(schema.SupplyLiquidity).values({
@@ -106,11 +216,16 @@ ponder.on("LendingPool:WithdrawLiquidity", async ({ event, context }) => {
       totalWithdrawn: user!.totalWithdrawn + BigInt(event.args.amount),
     });
   
-  // Update pool totals
+  // Update pool totals and assets/shares for APY calculation
   await context.db.update(schema.LendingPool, { id: poolAddress })
     .set({
       totalWithdrawals: pool!.totalWithdrawals + BigInt(event.args.amount),
+      totalSupplyAssets: pool!.totalSupplyAssets - BigInt(event.args.amount),
+      totalSupplyShares: pool!.totalSupplyShares - BigInt(event.args.shares),
     });
+
+  // Update APY calculations
+  await updatePoolAPY(poolAddress, context, BigInt(event.block.timestamp), BigInt(event.block.number));
 
   // Create WithdrawLiquidity event record
   await context.db.insert(schema.WithdrawLiquidity).values({
@@ -145,11 +260,16 @@ ponder.on("LendingPool:BorrowDebtCrosschain", async ({ event, context }) => {
       totalBorrowed: user!.totalBorrowed + BigInt(event.args.amount),
     });
   
-  // Update pool totals
+  // Update pool totals and assets/shares for APY calculation
   await context.db.update(schema.LendingPool, { id: poolAddress })
     .set({
       totalBorrows: pool!.totalBorrows + BigInt(event.args.amount),
+      totalBorrowAssets: pool!.totalBorrowAssets + BigInt(event.args.amount),
+      totalBorrowShares: pool!.totalBorrowShares + BigInt(event.args.shares),
     });
+
+  // Update APY calculations
+  await updatePoolAPY(poolAddress, context, BigInt(event.block.timestamp), BigInt(event.block.number));
 
   // Create BorrowDebtCrosschain event record
   await context.db.insert(schema.BorrowDebtCrosschain).values({

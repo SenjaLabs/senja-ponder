@@ -11,6 +11,15 @@ export const LendingPool = onchainTable("LendingPool", (t) => ({
   totalBorrows: t.bigint().notNull().default(0n),
   totalRepays: t.bigint().notNull().default(0n),
   totalSwaps: t.bigint().notNull().default(0n),
+  // APY tracking fields
+  totalSupplyAssets: t.bigint().notNull().default(0n),
+  totalSupplyShares: t.bigint().notNull().default(0n),
+  totalBorrowAssets: t.bigint().notNull().default(0n),
+  totalBorrowShares: t.bigint().notNull().default(0n),
+  utilizationRate: t.integer().notNull().default(0), // in basis points (0-10000)
+  supplyRate: t.integer().notNull().default(0), // in basis points per year
+  borrowRate: t.integer().notNull().default(0), // in basis points per year
+  lastAccrued: t.bigint().notNull().default(0n),
   created: t.bigint().notNull(),
 }));
 
@@ -121,6 +130,33 @@ export const SwapToken = onchainTable("SwapToken", (t) => ({
   tokenTo: t.text().notNull(),
   amountIn: t.bigint().notNull(),
   amountOut: t.bigint().notNull(),
+  timestamp: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+  transactionHash: t.text().notNull(),
+}));
+
+// APY and Interest Rate tracking
+export const PoolAPYSnapshot = onchainTable("PoolAPYSnapshot", (t) => ({
+  id: t.text().primaryKey(), // poolAddress-timestamp
+  pool: t.text().notNull(),
+  supplyAPY: t.integer().notNull(), // in basis points (1% = 100)
+  borrowAPY: t.integer().notNull(), // in basis points (1% = 100)
+  utilizationRate: t.integer().notNull(), // in basis points (100% = 10000)
+  totalSupplyAssets: t.bigint().notNull(),
+  totalBorrowAssets: t.bigint().notNull(),
+  timestamp: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+}));
+
+// Interest accrual events
+export const InterestAccrual = onchainTable("InterestAccrual", (t) => ({
+  id: t.text().primaryKey(),
+  pool: t.text().notNull(),
+  previousSupplyAssets: t.bigint().notNull(),
+  newSupplyAssets: t.bigint().notNull(),
+  previousBorrowAssets: t.bigint().notNull(),
+  newBorrowAssets: t.bigint().notNull(),
+  interestEarned: t.bigint().notNull(),
   timestamp: t.bigint().notNull(),
   blockNumber: t.bigint().notNull(),
   transactionHash: t.text().notNull(),

@@ -279,3 +279,177 @@ query GetSwapVolumeByTokens($tokenFrom: String!, $tokenTo: String!) {
   }
 }
 ```
+
+## APY and Interest Rate Queries
+
+### 14. Get Pool APY Data
+```graphql
+query GetPoolAPY($poolId: String!) {
+  lendingPool(id: $poolId) {
+    id
+    address
+    utilizationRate
+    supplyRate
+    borrowRate
+    totalSupplyAssets
+    totalBorrowAssets
+    totalSupplyShares
+    totalBorrowShares
+    lastAccrued
+  }
+}
+```
+
+### 15. Get APY History
+```graphql
+query GetAPYHistory($poolId: String!, $since: BigInt!) {
+  poolAPYSnapshots(
+    where: { 
+      pool: $poolId, 
+      timestamp: { gte: $since } 
+    }
+    orderBy: "timestamp"
+    orderDirection: "asc"
+  ) {
+    items {
+      id
+      supplyAPY
+      borrowAPY
+      utilizationRate
+      totalSupplyAssets
+      totalBorrowAssets
+      timestamp
+      blockNumber
+    }
+  }
+}
+```
+
+### 16. Get Latest APY Snapshots
+```graphql
+query GetLatestAPYSnapshots($limit: Int!) {
+  poolAPYSnapshots(
+    orderBy: "timestamp"
+    orderDirection: "desc"
+    limit: $limit
+  ) {
+    items {
+      pool
+      supplyAPY
+      borrowAPY
+      utilizationRate
+      timestamp
+    }
+  }
+}
+```
+
+### 17. Get Interest Accrual Events
+```graphql
+query GetInterestAccruals($poolId: String!) {
+  interestAccruals(
+    where: { pool: $poolId }
+    orderBy: "timestamp"
+    orderDirection: "desc"
+    limit: 50
+  ) {
+    items {
+      id
+      pool
+      interestEarned
+      previousSupplyAssets
+      newSupplyAssets
+      previousBorrowAssets
+      newBorrowAssets
+      timestamp
+      blockNumber
+      transactionHash
+    }
+  }
+}
+```
+
+### 18. Get Pool with Full Analytics
+```graphql
+query GetPoolAnalytics($poolId: String!) {
+  lendingPool(id: $poolId) {
+    id
+    address
+    factory
+    token0
+    token1
+    totalDeposits
+    totalWithdrawals
+    totalBorrows
+    totalRepays
+    totalSwaps
+    totalSupplyAssets
+    totalBorrowAssets
+    utilizationRate
+    supplyRate
+    borrowRate
+    lastAccrued
+    created
+  }
+}
+```
+
+### 19. Get Top Pools by TVL
+```graphql
+query GetTopPoolsByTVL($limit: Int!) {
+  lendingPools(
+    orderBy: "totalSupplyAssets"
+    orderDirection: "desc"
+    limit: $limit
+  ) {
+    items {
+      id
+      address
+      totalSupplyAssets
+      totalBorrowAssets
+      utilizationRate
+      supplyRate
+      borrowRate
+      token0
+      token1
+    }
+  }
+}
+```
+
+### 20. Get Pool Performance Over Time
+```graphql
+query GetPoolPerformance($poolId: String!, $timeframe: BigInt!) {
+  poolAPYSnapshots(
+    where: { 
+      pool: $poolId,
+      timestamp: { gte: $timeframe }
+    }
+    orderBy: "timestamp"
+    orderDirection: "asc"
+  ) {
+    items {
+      supplyAPY
+      borrowAPY
+      utilizationRate
+      totalSupplyAssets
+      totalBorrowAssets
+      timestamp
+    }
+  }
+  
+  interestAccruals(
+    where: { 
+      pool: $poolId,
+      timestamp: { gte: $timeframe }
+    }
+    orderBy: "timestamp"
+    orderDirection: "desc"
+  ) {
+    items {
+      interestEarned
+      timestamp
+    }
+  }
+}
+```
