@@ -160,6 +160,43 @@ export const LendingPoolAbi =
         },
         {
           indexed: false,
+          name: "tokenFrom",
+          internalType: "address",
+          type: "address",
+        },
+        {
+          indexed: false,
+          name: "tokenTo",
+          internalType: "address",
+          type: "address",
+        },
+        {
+          indexed: false,
+          name: "amountIn",
+          internalType: "uint256",
+          type: "uint256",
+        },
+        {
+          indexed: false,
+          name: "amountOut",
+          internalType: "uint256",
+          type: "uint256",
+        },
+      ],
+      name: "SwapToken",
+      anonymous: false,
+      type: "event",
+    },
+    {
+      inputs: [
+        {
+          indexed: false,
+          name: "user",
+          internalType: "address",
+          type: "address",
+        },
+        {
+          indexed: false,
           name: "amount",
           internalType: "uint256",
           type: "uint256",

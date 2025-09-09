@@ -10,6 +10,7 @@ export const LendingPool = onchainTable("LendingPool", (t) => ({
   totalWithdrawals: t.bigint().notNull().default(0n),
   totalBorrows: t.bigint().notNull().default(0n),
   totalRepays: t.bigint().notNull().default(0n),
+  totalSwaps: t.bigint().notNull().default(0n),
   created: t.bigint().notNull(),
 }));
 
@@ -20,6 +21,7 @@ export const User = onchainTable("User", (t) => ({
   totalWithdrawn: t.bigint().notNull().default(0n),
   totalBorrowed: t.bigint().notNull().default(0n),
   totalRepaid: t.bigint().notNull().default(0n),
+  totalSwapped: t.bigint().notNull().default(0n),
 }));
 
 export const LendingPoolFactory = onchainTable("LendingPoolFactory", (t) => ({
@@ -106,6 +108,19 @@ export const CreatePosition = onchainTable("CreatePosition", (t) => ({
   id: t.text().primaryKey(),
   user: t.text().notNull(),
   pool: t.text().notNull(),
+  timestamp: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+  transactionHash: t.text().notNull(),
+}));
+
+export const SwapToken = onchainTable("SwapToken", (t) => ({
+  id: t.text().primaryKey(),
+  user: t.text().notNull(),
+  pool: t.text().notNull(),
+  tokenFrom: t.text().notNull(),
+  tokenTo: t.text().notNull(),
+  amountIn: t.bigint().notNull(),
+  amountOut: t.bigint().notNull(),
   timestamp: t.bigint().notNull(),
   blockNumber: t.bigint().notNull(),
   transactionHash: t.text().notNull(),

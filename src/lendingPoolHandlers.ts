@@ -17,6 +17,7 @@ async function getOrCreateUser(userAddress: string, context: any) {
       totalWithdrawn: 0n,
       totalBorrowed: 0n,
       totalRepaid: 0n,
+      totalSwapped: 0n,
     });
     user = await context.db.find(schema.User, { id: userAddress });
   }
@@ -38,6 +39,7 @@ async function getOrCreatePool(poolAddress: string, context: any) {
       totalWithdrawals: 0n,
       totalBorrows: 0n,
       totalRepays: 0n,
+      totalSwaps: 0n,
       created: 0n,
     });
     pool = await context.db.find(schema.LendingPool, { id: poolAddress });
@@ -257,6 +259,46 @@ ponder.on("LendingPool:CreatePosition", async ({ event, context }) => {
   console.log(`✅ CreatePosition processed: ${userAddress} created position in pool ${poolAddress}`);
 });
 
+// 7. SwapToken Event Handler
+ponder.on("LendingPool:SwapToken", async ({ event, context }) => {
+  console.log("🔄 SwapToken event:", event.args);
+  
+  const poolAddress = event.log.address;
+  const userAddress = event.args.user;
+  
+  // Get or create user and pool
+  let user = await getOrCreateUser(userAddress, context);
+  let pool = await getOrCreatePool(poolAddress, context);
+
+  // Update user totals
+  await context.db.update(schema.User, { id: userAddress })
+    .set({
+      totalSwapped: user!.totalSwapped + BigInt(event.args.amountIn),
+    });
+
+  // Update pool totals
+  await context.db.update(schema.LendingPool, { id: poolAddress })
+    .set({
+      totalSwaps: pool!.totalSwaps + BigInt(event.args.amountIn),
+    });
+
+  // Create SwapToken event record
+  await context.db.insert(schema.SwapToken).values({
+    id: createEventID(BigInt(event.block.number), event.log.logIndex!),
+    user: userAddress,
+    pool: poolAddress,
+    tokenFrom: event.args.tokenFrom,
+    tokenTo: event.args.tokenTo,
+    amountIn: BigInt(event.args.amountIn),
+    amountOut: BigInt(event.args.amountOut),
+    timestamp: BigInt(event.block.timestamp),
+    blockNumber: BigInt(event.block.number),
+    transactionHash: event.transaction.hash,
+  });
+
+  console.log(`✅ SwapToken processed: ${userAddress} swapped ${event.args.amountIn} ${event.args.tokenFrom} for ${event.args.amountOut} ${event.args.tokenTo} in pool ${poolAddress}`);
+});
+
 console.log("🚀 LendingPool event handlers loaded and ACTIVE!");
 console.log("📋 All handlers are now enabled and ready to index events:");
 console.log("   - SupplyLiquidity 🏦 ✅ ACTIVE");
@@ -265,8 +307,48 @@ console.log("   - BorrowDebtCrosschain 🌉 ✅ ACTIVE");
 console.log("   - RepayWithCollateralByPosition 💰 ✅ ACTIVE");
 console.log("   - SupplyCollateral 🔒 ✅ ACTIVE");
 console.log("   - CreatePosition 📍 ✅ ACTIVE");
+console.log("   - SwapToken 🔄 ✅ ACTIVE");
 console.log("🎯 TypeScript errors are expected but handlers will work!");
 console.log("🔥 All events will now be indexed and stored in database!");
+
+// ========================================
+// SWAP TRACKING FUNCTIONALITY
+// ========================================
+
+// Helper function to track swap transactions
+async function trackSwapTransaction(
+  userAddress: string,
+  poolAddress: string,
+  tokenFrom: string,
+  tokenTo: string,
+  amountIn: bigint,
+  amountOut: bigint,
+  timestamp: bigint,
+  blockNumber: bigint,
+  transactionHash: string,
+  logIndex: number,
+  context: any
+) {
+  // Get or create user and pool
+  await getOrCreateUser(userAddress, context);
+  await getOrCreatePool(poolAddress, context);
+
+  // Create SwapToken event record
+  await context.db.insert(schema.SwapToken).values({
+    id: createEventID(blockNumber, logIndex),
+    user: userAddress,
+    pool: poolAddress,
+    tokenFrom: tokenFrom,
+    tokenTo: tokenTo,
+    amountIn: amountIn,
+    amountOut: amountOut,
+    timestamp: timestamp,
+    blockNumber: blockNumber,
+    transactionHash: transactionHash,
+  });
+
+  console.log(`🔄 Swap tracked: ${userAddress} swapped ${amountIn.toString()} ${tokenFrom} for ${amountOut.toString()} ${tokenTo}`);
+}
 
 // ========================================
 // INSTRUCTIONS FOR ACTIVATING HANDLERS
