@@ -147,3 +147,309 @@ subscription OnNewPoolCreated {
 2. Tunggu beberapa detik untuk indexing
 3. Query melalui GraphQL untuk melihat pool baru
 4. Monitor logs Ponder untuk memastikan event terdeteksi
+
+## Swap Token Queries
+
+### 7. Get All Swap Transactions
+```graphql
+query GetAllSwaps {
+  swapTokens {
+    items {
+      id
+      user
+      pool
+      tokenFrom
+      tokenTo
+      amountIn
+      amountOut
+      timestamp
+      blockNumber
+      transactionHash
+    }
+  }
+}
+```
+
+### 8. Get Swaps by User
+```graphql
+query GetSwapsByUser($userAddress: String!) {
+  swapTokens(where: { user: $userAddress }) {
+    items {
+      id
+      pool
+      tokenFrom
+      tokenTo
+      amountIn
+      amountOut
+      timestamp
+      transactionHash
+    }
+  }
+}
+```
+
+### 9. Get Swaps by Pool
+```graphql
+query GetSwapsByPool($poolAddress: String!) {
+  swapTokens(where: { pool: $poolAddress }) {
+    items {
+      id
+      user
+      tokenFrom
+      tokenTo
+      amountIn
+      amountOut
+      timestamp
+      transactionHash
+    }
+  }
+}
+```
+
+### 10. Get User with All Statistics
+```graphql
+query GetUserStats($userAddress: String!) {
+  user(id: $userAddress) {
+    id
+    address
+    totalDeposited
+    totalWithdrawn
+    totalBorrowed
+    totalRepaid
+    totalSwapped
+  }
+}
+```
+
+### 11. Get Pool with All Statistics
+```graphql
+query GetPoolStats($poolAddress: String!) {
+  lendingPool(id: $poolAddress) {
+    id
+    address
+    factory
+    token0
+    token1
+    totalDeposits
+    totalWithdrawals
+    totalBorrows
+    totalRepays
+    totalSwaps
+    created
+  }
+}
+```
+
+### 12. Get Latest Swap Transactions
+```graphql
+query GetLatestSwaps($limit: Int!) {
+  swapTokens(
+    orderBy: "timestamp"
+    orderDirection: "desc"
+    limit: $limit
+  ) {
+    items {
+      id
+      user
+      pool
+      tokenFrom
+      tokenTo
+      amountIn
+      amountOut
+      timestamp
+    }
+  }
+}
+```
+
+### 13. Get Swap Volume by Token Pair
+```graphql
+query GetSwapVolumeByTokens($tokenFrom: String!, $tokenTo: String!) {
+  swapTokens(where: { 
+    tokenFrom: $tokenFrom, 
+    tokenTo: $tokenTo 
+  }) {
+    items {
+      amountIn
+      amountOut
+      timestamp
+      user
+      pool
+    }
+  }
+}
+```
+
+## APY and Interest Rate Queries
+
+### 14. Get Pool APY Data
+```graphql
+query GetPoolAPY($poolId: String!) {
+  lendingPool(id: $poolId) {
+    id
+    address
+    utilizationRate
+    supplyRate
+    borrowRate
+    totalSupplyAssets
+    totalBorrowAssets
+    totalSupplyShares
+    totalBorrowShares
+    lastAccrued
+  }
+}
+```
+
+### 15. Get APY History
+```graphql
+query GetAPYHistory($poolId: String!, $since: BigInt!) {
+  poolAPYSnapshots(
+    where: { 
+      pool: $poolId, 
+      timestamp: { gte: $since } 
+    }
+    orderBy: "timestamp"
+    orderDirection: "asc"
+  ) {
+    items {
+      id
+      supplyAPY
+      borrowAPY
+      utilizationRate
+      totalSupplyAssets
+      totalBorrowAssets
+      timestamp
+      blockNumber
+    }
+  }
+}
+```
+
+### 16. Get Latest APY Snapshots
+```graphql
+query GetLatestAPYSnapshots($limit: Int!) {
+  poolAPYSnapshots(
+    orderBy: "timestamp"
+    orderDirection: "desc"
+    limit: $limit
+  ) {
+    items {
+      pool
+      supplyAPY
+      borrowAPY
+      utilizationRate
+      timestamp
+    }
+  }
+}
+```
+
+### 17. Get Interest Accrual Events
+```graphql
+query GetInterestAccruals($poolId: String!) {
+  interestAccruals(
+    where: { pool: $poolId }
+    orderBy: "timestamp"
+    orderDirection: "desc"
+    limit: 50
+  ) {
+    items {
+      id
+      pool
+      interestEarned
+      previousSupplyAssets
+      newSupplyAssets
+      previousBorrowAssets
+      newBorrowAssets
+      timestamp
+      blockNumber
+      transactionHash
+    }
+  }
+}
+```
+
+### 18. Get Pool with Full Analytics
+```graphql
+query GetPoolAnalytics($poolId: String!) {
+  lendingPool(id: $poolId) {
+    id
+    address
+    factory
+    token0
+    token1
+    totalDeposits
+    totalWithdrawals
+    totalBorrows
+    totalRepays
+    totalSwaps
+    totalSupplyAssets
+    totalBorrowAssets
+    utilizationRate
+    supplyRate
+    borrowRate
+    lastAccrued
+    created
+  }
+}
+```
+
+### 19. Get Top Pools by TVL
+```graphql
+query GetTopPoolsByTVL($limit: Int!) {
+  lendingPools(
+    orderBy: "totalSupplyAssets"
+    orderDirection: "desc"
+    limit: $limit
+  ) {
+    items {
+      id
+      address
+      totalSupplyAssets
+      totalBorrowAssets
+      utilizationRate
+      supplyRate
+      borrowRate
+      token0
+      token1
+    }
+  }
+}
+```
+
+### 20. Get Pool Performance Over Time
+```graphql
+query GetPoolPerformance($poolId: String!, $timeframe: BigInt!) {
+  poolAPYSnapshots(
+    where: { 
+      pool: $poolId,
+      timestamp: { gte: $timeframe }
+    }
+    orderBy: "timestamp"
+    orderDirection: "asc"
+  ) {
+    items {
+      supplyAPY
+      borrowAPY
+      utilizationRate
+      totalSupplyAssets
+      totalBorrowAssets
+      timestamp
+    }
+  }
+  
+  interestAccruals(
+    where: { 
+      pool: $poolId,
+      timestamp: { gte: $timeframe }
+    }
+    orderBy: "timestamp"
+    orderDirection: "desc"
+  ) {
+    items {
+      interestEarned
+      timestamp
+    }
+  }
+}
+```
