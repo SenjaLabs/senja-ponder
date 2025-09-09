@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "NODE_ENV=development ponder dev",
-    "start": "NODE_ENV=production ponder start",
+    "start": "NODE_ENV=production ponder start --schema public",
     "start:local": "NODE_ENV=development ponder start",
     "start:env": "dotenv -e .env.production -- ponder start",
     "build": "pnpm run codegen",
