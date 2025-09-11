@@ -161,3 +161,35 @@ export const InterestAccrual = onchainTable("InterestAccrual", (t) => ({
   blockNumber: t.bigint().notNull(),
   transactionHash: t.text().notNull(),
 }));
+
+// User Collateral Position in a Pool
+export const UserCollateral = onchainTable("UserCollateral", (t) => ({
+  id: t.text().primaryKey(), // user-pool-asset
+  user: t.text().notNull(),
+  pool: t.text().notNull(),
+  asset: t.text().notNull(),
+  totalCollateralAmount: t.bigint().notNull().default(0n),
+  totalCollateralValue: t.bigint().notNull().default(0n), // in USD or base currency
+  collateralFactor: t.integer().notNull().default(0), // LTV ratio in basis points
+  isActive: t.boolean().notNull().default(true),
+  lastUpdated: t.bigint().notNull(),
+  createdAt: t.bigint().notNull(),
+}));
+
+// User Borrow Position in a Pool
+export const UserBorrow = onchainTable("UserBorrow", (t) => ({
+  id: t.text().primaryKey(), // user-pool-asset
+  user: t.text().notNull(),
+  pool: t.text().notNull(),
+  asset: t.text().notNull(),
+  totalBorrowedAmount: t.bigint().notNull().default(0n),
+  totalBorrowedValue: t.bigint().notNull().default(0n), // in USD or base currency
+  accruedInterest: t.bigint().notNull().default(0n),
+  borrowRate: t.integer().notNull().default(0), // current borrow rate in basis points
+  borrowRateMode: t.bigint().notNull().default(1n), // 1 for stable, 2 for variable
+  healthFactor: t.bigint().notNull().default(0n), // health factor (scaled by 1e18)
+  isActive: t.boolean().notNull().default(true),
+  lastAccrued: t.bigint().notNull(),
+  lastUpdated: t.bigint().notNull(),
+  createdAt: t.bigint().notNull(),
+}));
