@@ -95,6 +95,32 @@ async function getOrCreateUserBorrow(
   return userBorrow;
 }
 
+// Helper function to get user position address
+async function getUserPositionAddress(
+  userAddress: string,
+  poolAddress: string,
+  context: any
+): Promise<string | null> {
+  const userPositionId = `${userAddress}-${poolAddress}`;
+  const userPosition = await context.db.find(schema.UserPosition, { id: userPositionId });
+  return userPosition?.positionAddress || null;
+}
+
+// Helper function to get all user positions
+async function getAllUserPositions(
+  userAddress: string,
+  context: any
+): Promise<Array<{ pool: string; positionAddress: string }>> {
+  const positions = await context.db.findMany(schema.UserPosition, {
+    where: { user: userAddress, isActive: true }
+  });
+  
+  return positions.map((pos: any) => ({
+    pool: pos.pool,
+    positionAddress: pos.positionAddress,
+  }));
+}
+
 async function updateUserCollateral(
   userAddress: string,
   poolAddress: string,
@@ -632,6 +658,7 @@ ponder.on("LendingPool:CreatePosition", async ({ event, context }) => {
   
   const poolAddress = event.log.address;
   const userAddress = event.args.user;
+  const positionAddress = event.args.positionAddress;
   
   // Get or create user and pool
   await getOrCreateUser(userAddress, context);
@@ -642,12 +669,36 @@ ponder.on("LendingPool:CreatePosition", async ({ event, context }) => {
     id: createEventID(BigInt(event.block.number), event.log.logIndex!),
     user: userAddress,
     pool: poolAddress,
+    positionAddress: positionAddress,
     timestamp: BigInt(event.block.timestamp),
     blockNumber: BigInt(event.block.number),
     transactionHash: event.transaction.hash,
   });
 
-  console.log(`✅ CreatePosition processed: ${userAddress} created position in pool ${poolAddress}`);
+  // Create or update UserPosition mapping
+  const userPositionId = `${userAddress}-${poolAddress}`;
+  const existingPosition = await context.db.find(schema.UserPosition, { id: userPositionId });
+  
+  if (existingPosition) {
+    await context.db.update(schema.UserPosition, { id: userPositionId })
+      .set({
+        positionAddress: positionAddress,
+        isActive: true,
+        lastUpdated: BigInt(event.block.timestamp),
+      });
+  } else {
+    await context.db.insert(schema.UserPosition).values({
+      id: userPositionId,
+      user: userAddress,
+      pool: poolAddress,
+      positionAddress: positionAddress,
+      isActive: true,
+      createdAt: BigInt(event.block.timestamp),
+      lastUpdated: BigInt(event.block.timestamp),
+    });
+  }
+
+  console.log(`✅ CreatePosition processed: ${userAddress} created position ${positionAddress} in pool ${poolAddress}`);
 });
 
 // 7. SwapToken Event Handler

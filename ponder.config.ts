@@ -44,7 +44,7 @@ export default createConfig({
       chain: "base",
       abi: LendingPoolFactoryAbi,
       address: "0x31c3850D2cBDC5B084D632d1c61d54161790bFF8",
-      startBlock: 34979177,
+      startBlock: 30396548,
       includeTransactionReceipts: true,
     },
     // Dynamic pool addresses using factory pattern
@@ -56,7 +56,7 @@ export default createConfig({
         event: parseAbiItem("event LendingPoolCreated(address indexed collateralToken, address indexed borrowToken, address indexed lendingPool, uint256 ltv)"),
         parameter: "lendingPool",
       }),
-      startBlock: 34979177,
+      startBlock: 30396548,
       includeTransactionReceipts: true,
     },
   },

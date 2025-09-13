@@ -117,6 +117,7 @@ export const CreatePosition = onchainTable("CreatePosition", (t) => ({
   id: t.text().primaryKey(),
   user: t.text().notNull(),
   pool: t.text().notNull(),
+  positionAddress: t.text().notNull(),
   timestamp: t.bigint().notNull(),
   blockNumber: t.bigint().notNull(),
   transactionHash: t.text().notNull(),
@@ -133,6 +134,17 @@ export const SwapToken = onchainTable("SwapToken", (t) => ({
   timestamp: t.bigint().notNull(),
   blockNumber: t.bigint().notNull(),
   transactionHash: t.text().notNull(),
+}));
+
+// User Position tracking - maps users to their position addresses in each pool
+export const UserPosition = onchainTable("UserPosition", (t) => ({
+  id: t.text().primaryKey(), // user-pool
+  user: t.text().notNull(),
+  pool: t.text().notNull(),
+  positionAddress: t.text().notNull(),
+  isActive: t.boolean().notNull().default(true),
+  createdAt: t.bigint().notNull(),
+  lastUpdated: t.bigint().notNull(),
 }));
 
 // APY and Interest Rate tracking
