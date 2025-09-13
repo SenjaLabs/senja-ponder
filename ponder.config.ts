@@ -35,15 +35,15 @@ export default createConfig({
   database: getDatabaseConfig(),
   chains: {
     base: {
-      id: 8453,
-      rpc: "wss://base-rpc.publicnode.com",
+      id: 84532,
+      rpc: "wss://base-sepolia-rpc.publicnode.com",
     },
   },
   contracts: {
     LendingPoolFactory: {
       chain: "base",
       abi: LendingPoolFactoryAbi,
-      address: "0x67165C24A886AAAf1bFA81934e44a2063c6B608C",
+      address: "0x31c3850D2cBDC5B084D632d1c61d54161790bFF8",
       startBlock: 34979177,
       includeTransactionReceipts: true,
     },
@@ -52,7 +52,7 @@ export default createConfig({
       chain: "base",
       abi: LendingPoolAbi,
       address: factory({
-        address: "0x67165C24A886AAAf1bFA81934e44a2063c6B608C",
+        address: "0x31c3850D2cBDC5B084D632d1c61d54161790bFF8",
         event: parseAbiItem("event LendingPoolCreated(address indexed collateralToken, address indexed borrowToken, address indexed lendingPool, uint256 ltv)"),
         parameter: "lendingPool",
       }),
