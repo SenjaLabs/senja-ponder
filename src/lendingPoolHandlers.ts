@@ -7,7 +7,8 @@ import {
 
 // Type definitions for database context and operations
 interface PonderContext {
-  db: any; 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  db: any; // Ponder framework requires any for database operations
 }
 
 interface UserPositionData {
