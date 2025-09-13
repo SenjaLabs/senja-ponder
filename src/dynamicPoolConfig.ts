@@ -1,6 +1,3 @@
-// Dynamic Pool Configuration Helper
-// Digunakan untuk mengupdate konfigurasi pool secara dinamis
-
 export interface DynamicPoolConfig {
   address: string;
   collateralToken: string;

@@ -1,20 +1,58 @@
-/**
- * APY API Endpoints
- * 
- * This module provides utility functions for accessing APY data,
- * pool analytics, and interest rate information.
- */
-
 import { PoolAnalytics, formatRate } from "../apyCalculator";
 
-/**
- * Get current APY data for a pool
- */
-export async function getCurrentAPY(poolAddress: string, db: any) {
+// Type definitions for database operations
+interface DatabaseContext {
+  find: (
+    table: string,
+    query: { id: string }
+  ) => Promise<LendingPoolData | null>;
+  findMany: (table: string, options?: QueryOptions) => Promise<unknown[]>;
+}
+
+interface LendingPoolData {
+  id: string;
+  address: string;
+  totalSupplyAssets: bigint;
+  totalSupplyShares: bigint;
+  totalBorrowAssets: bigint;
+  totalBorrowShares: bigint;
+  lastAccrued: bigint;
+  token0: string;
+  token1: string;
+}
+
+interface PoolAPYSnapshotData {
+  timestamp: bigint;
+  supplyAPY: number;
+  borrowAPY: number;
+  utilizationRate: number;
+  totalSupplyAssets: bigint;
+  totalBorrowAssets: bigint;
+}
+
+interface InterestAccrualData {
+  id: string;
+  pool: string;
+  interestEarned: bigint;
+  previousSupplyAssets: bigint;
+  newSupplyAssets: bigint;
+  previousBorrowAssets: bigint;
+  newBorrowAssets: bigint;
+  timestamp: bigint;
+  blockNumber: bigint;
+}
+
+interface QueryOptions {
+  where?: Record<string, unknown>;
+  orderBy?: Record<string, string>;
+  limit?: number;
+}
+
+export async function getCurrentAPY(poolAddress: string, db: DatabaseContext) {
   try {
     // Get pool data from database
     const pool = await db.find("LendingPool", { id: poolAddress });
-    
+
     if (!pool) {
       throw new Error("Pool not found");
     }
@@ -39,7 +77,7 @@ export async function getCurrentAPY(poolAddress: string, db: any) {
       totalSupplyAssets: pool.totalSupplyAssets.toString(),
       totalBorrowAssets: pool.totalBorrowAssets.toString(),
       lastUpdated: new Date(Number(pool.lastAccrued) * 1000).toISOString(),
-      analytics: analytics.getFormattedAnalytics()
+      analytics: analytics.getFormattedAnalytics(),
     };
   } catch (error) {
     console.error("Error fetching APY data:", error);
@@ -50,12 +88,16 @@ export async function getCurrentAPY(poolAddress: string, db: any) {
 /**
  * Get APY history for a pool
  */
-export async function getAPYHistory(poolAddress: string, timeframe: string = "24h", db: any) {
+export async function getAPYHistory(
+  poolAddress: string,
+  timeframe: string = "24h",
+  db: DatabaseContext
+) {
   try {
     // Calculate timestamp based on timeframe
     const now = Math.floor(Date.now() / 1000);
     let startTime: number;
-    
+
     switch (timeframe) {
       case "1h":
         startTime = now - 3600;
@@ -77,25 +119,27 @@ export async function getAPYHistory(poolAddress: string, timeframe: string = "24
     const snapshots = await db.findMany("PoolAPYSnapshot", {
       where: {
         pool: poolAddress,
-        timestamp: { gte: BigInt(startTime) }
+        timestamp: { gte: BigInt(startTime) },
       },
-      orderBy: { timestamp: "asc" }
+      orderBy: { timestamp: "asc" },
     });
 
-    const formattedSnapshots = snapshots.map((snapshot: any) => ({
-      timestamp: new Date(Number(snapshot.timestamp) * 1000).toISOString(),
-      supplyAPY: formatRate(snapshot.supplyAPY),
-      borrowAPY: formatRate(snapshot.borrowAPY),
-      utilizationRate: formatRate(snapshot.utilizationRate),
-      totalSupplyAssets: snapshot.totalSupplyAssets.toString(),
-      totalBorrowAssets: snapshot.totalBorrowAssets.toString(),
-    }));
+    const formattedSnapshots = (snapshots as PoolAPYSnapshotData[]).map(
+      (snapshot: PoolAPYSnapshotData) => ({
+        timestamp: new Date(Number(snapshot.timestamp) * 1000).toISOString(),
+        supplyAPY: formatRate(snapshot.supplyAPY),
+        borrowAPY: formatRate(snapshot.borrowAPY),
+        utilizationRate: formatRate(snapshot.utilizationRate),
+        totalSupplyAssets: snapshot.totalSupplyAssets.toString(),
+        totalBorrowAssets: snapshot.totalBorrowAssets.toString(),
+      })
+    );
 
     return {
       pool: poolAddress,
       timeframe,
       snapshots: formattedSnapshots,
-      count: formattedSnapshots.length
+      count: formattedSnapshots.length,
     };
   } catch (error) {
     console.error("Error fetching APY history:", error);
@@ -106,13 +150,13 @@ export async function getAPYHistory(poolAddress: string, timeframe: string = "24
 /**
  * Get all pools with current APY
  */
-export async function getAllPoolsAPY(db: any) {
+export async function getAllPoolsAPY(db: DatabaseContext) {
   try {
     const pools = await db.findMany("LendingPool", {
-      orderBy: { totalSupplyAssets: "desc" }
+      orderBy: { totalSupplyAssets: "desc" },
     });
 
-    const poolsWithAPY = pools.map((pool: any) => {
+    const poolsWithAPY = (pools as LendingPoolData[]).map((pool: LendingPoolData) => {
       const analytics = new PoolAnalytics(
         BigInt(pool.totalSupplyAssets),
         BigInt(pool.totalSupplyShares),
@@ -136,7 +180,7 @@ export async function getAllPoolsAPY(db: any) {
 
     return {
       pools: poolsWithAPY,
-      count: poolsWithAPY.length
+      count: poolsWithAPY.length,
     };
   } catch (error) {
     console.error("Error fetching pools APY:", error);
@@ -147,17 +191,21 @@ export async function getAllPoolsAPY(db: any) {
 /**
  * Get interest accrual events
  */
-export async function getInterestAccruals(poolAddress?: string, limit: number = 50, db?: any) {
+export async function getInterestAccruals(
+  db: DatabaseContext,
+  poolAddress?: string,
+  limit: number = 50
+) {
   try {
     const where = poolAddress ? { pool: poolAddress } : {};
-    
+
     const accruals = await db.findMany("InterestAccrual", {
       where,
       orderBy: { timestamp: "desc" },
-      limit: limit
+      limit: limit,
     });
 
-    const formattedAccruals = accruals.map((accrual: any) => ({
+    const formattedAccruals = (accruals as InterestAccrualData[]).map((accrual: InterestAccrualData) => ({
       id: accrual.id,
       pool: accrual.pool,
       interestEarned: accrual.interestEarned.toString(),
@@ -171,16 +219,10 @@ export async function getInterestAccruals(poolAddress?: string, limit: number = 
 
     return {
       accruals: formattedAccruals,
-      count: formattedAccruals.length
+      count: formattedAccruals.length,
     };
   } catch (error) {
     console.error("Error fetching accruals:", error);
     throw error;
   }
 }
-
-console.log("📊 APY API utilities loaded:");
-console.log("   getCurrentAPY(poolAddress, db) - Current APY for pool");
-console.log("   getAPYHistory(poolAddress, timeframe, db) - APY history");
-console.log("   getAllPoolsAPY(db) - All pools with current APY");
-console.log("   getInterestAccruals(poolAddress, limit, db) - Interest accrual events");

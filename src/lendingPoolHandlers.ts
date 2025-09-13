@@ -2,19 +2,45 @@ import { ponder } from "ponder:registry";
 import * as schema from "../ponder.schema";
 import { 
   PoolAnalytics, 
-  calculateUtilizationRate, 
-  calculateBorrowRate, 
-  calculateSupplyRate,
-  calculateAPY,
   DEFAULT_INTEREST_MODEL 
 } from "./apyCalculator";
+
+// Type definitions for database context and operations
+interface PonderContext {
+  db: any; 
+}
+
+interface UserPositionData {
+  id: string;
+  user: string;
+  pool: string;
+  positionAddress: string;
+}
+
+interface UserCollateralData {
+  id: string;
+  user: string;
+  pool: string;
+  asset: string;
+  totalCollateralAmount: bigint;
+  isActive?: boolean;
+}
+
+interface UserBorrowData {
+  id: string;
+  user: string;
+  pool: string;
+  asset: string;
+  totalBorrowedAmount: bigint;
+  isActive?: boolean;
+}
 
 // Helper functions
 function createEventID(blockNumber: bigint, logIndex: number): string {
   return `${blockNumber.toString()}-${logIndex.toString()}`;
 }
 
-async function getOrCreateUser(userAddress: string, context: any) {
+async function getOrCreateUser(userAddress: string, context: PonderContext) {
   let user = await context.db.find(schema.User, { id: userAddress });
   
   if (!user) {
@@ -37,7 +63,7 @@ async function getOrCreateUserCollateral(
   userAddress: string, 
   poolAddress: string, 
   assetAddress: string, 
-  context: any,
+  context: PonderContext,
   timestamp: bigint
 ) {
   const id = `${userAddress}-${poolAddress}-${assetAddress}`;
@@ -66,7 +92,7 @@ async function getOrCreateUserBorrow(
   userAddress: string, 
   poolAddress: string, 
   assetAddress: string, 
-  context: any,
+  context: PonderContext,
   timestamp: bigint
 ) {
   const id = `${userAddress}-${poolAddress}-${assetAddress}`;
@@ -96,10 +122,10 @@ async function getOrCreateUserBorrow(
 }
 
 // Helper function to get user position address
-async function getUserPositionAddress(
+async function _getUserPositionAddress(
   userAddress: string,
   poolAddress: string,
-  context: any
+  context: PonderContext
 ): Promise<string | null> {
   const userPositionId = `${userAddress}-${poolAddress}`;
   const userPosition = await context.db.find(schema.UserPosition, { id: userPositionId });
@@ -107,15 +133,15 @@ async function getUserPositionAddress(
 }
 
 // Helper function to get all user positions
-async function getAllUserPositions(
+async function _getAllUserPositions(
   userAddress: string,
-  context: any
+  context: PonderContext
 ): Promise<Array<{ pool: string; positionAddress: string }>> {
   const positions = await context.db.findMany(schema.UserPosition, {
     where: { user: userAddress, isActive: true }
   });
   
-  return positions.map((pos: any) => ({
+  return positions.map((pos: UserPositionData) => ({
     pool: pos.pool,
     positionAddress: pos.positionAddress,
   }));
@@ -127,7 +153,7 @@ async function updateUserCollateral(
   assetAddress: string,
   amount: bigint,
   isAdd: boolean,
-  context: any,
+  context: PonderContext,
   timestamp: bigint
 ) {
   const userCollateral = await getOrCreateUserCollateral(userAddress, poolAddress, assetAddress, context, timestamp);
@@ -152,7 +178,7 @@ async function updateUserBorrow(
   assetAddress: string,
   amount: bigint,
   isAdd: boolean,
-  context: any,
+  context: PonderContext,
   timestamp: bigint,
   borrowRate?: number
 ) {
@@ -174,10 +200,10 @@ async function updateUserBorrow(
   console.log(`💰 User borrow updated: ${userAddress} now owes ${newAmount.toString()} ${assetAddress} in pool ${poolAddress}`);
 }
 
-async function calculateUserHealthFactor(
+async function _calculateUserHealthFactor(
   userAddress: string,
   poolAddress: string,
-  context: any
+  context: PonderContext
 ): Promise<bigint> {
   // Simple health factor calculation: totalCollateralValue * collateralFactor / totalBorrowedValue
   // This is a simplified version - in production, you'd need price oracles and proper risk parameters
@@ -186,7 +212,7 @@ async function calculateUserHealthFactor(
     // Get all user collateral positions for this pool
     const userCollaterals = await context.db.select({
       from: schema.UserCollateral,
-      where: (userCollateral: any) => 
+      where: (userCollateral: UserCollateralData) => 
         userCollateral.user === userAddress && 
         userCollateral.pool === poolAddress && 
         userCollateral.isActive === true
@@ -195,7 +221,7 @@ async function calculateUserHealthFactor(
     // Get all user borrow positions for this pool
     const userBorrows = await context.db.select({
       from: schema.UserBorrow,
-      where: (userBorrow: any) => 
+      where: (userBorrow: UserBorrowData) => 
         userBorrow.user === userAddress && 
         userBorrow.pool === poolAddress && 
         userBorrow.isActive === true
@@ -230,11 +256,11 @@ async function calculateUserHealthFactor(
   }
 }
 
-async function accrueUserInterest(
+async function _accrueUserInterest(
   userAddress: string,
   poolAddress: string,
   assetAddress: string,
-  context: any,
+  context: PonderContext,
   currentTimestamp: bigint,
   currentBorrowRate: number
 ) {
@@ -274,7 +300,7 @@ async function accrueUserInterest(
 
 async function updatePoolAPY(
   poolAddress: string, 
-  context: any, 
+  context: PonderContext, 
   timestamp: bigint, 
   blockNumber: bigint
 ) {
@@ -360,7 +386,7 @@ async function updatePoolAPY(
   console.log(`   Interest Earned: ${accrual.interestEarned.toString()}`);
 }
 
-async function getOrCreatePool(poolAddress: string, context: any) {
+async function getOrCreatePool(poolAddress: string, context: PonderContext) {
   let pool = await context.db.find(schema.LendingPool, { id: poolAddress });
   
   if (!pool) {
@@ -392,7 +418,7 @@ async function getOrCreatePool(poolAddress: string, context: any) {
   return pool;
 }
 
-async function getPoolTokens(poolAddress: string, context: any): Promise<{ collateralToken: string, borrowToken: string }> {
+async function getPoolTokens(poolAddress: string, context: PonderContext): Promise<{ collateralToken: string, borrowToken: string }> {
   // Try to get pool creation info to determine the correct tokens
   const poolCreated = await context.db.find(schema.LendingPoolCreated, { lendingPool: poolAddress });
   
@@ -432,8 +458,8 @@ ponder.on("LendingPool:SupplyLiquidity", async ({ event, context }) => {
   const userAddress = event.args.user;
   
   // Get or create user and pool
-  let user = await getOrCreateUser(userAddress, context);
-  let pool = await getOrCreatePool(poolAddress, context);
+  const user = await getOrCreateUser(userAddress, context);
+  const pool = await getOrCreatePool(poolAddress, context);
   
   // Update user totals
   await context.db.update(schema.User, { id: userAddress })
@@ -476,8 +502,8 @@ ponder.on("LendingPool:WithdrawLiquidity", async ({ event, context }) => {
   const userAddress = event.args.user;
   
   // Get or create user and pool
-  let user = await getOrCreateUser(userAddress, context);
-  let pool = await getOrCreatePool(poolAddress, context);
+  const user = await getOrCreateUser(userAddress, context);
+  const pool = await getOrCreatePool(poolAddress, context);
   
   // Update user totals
   await context.db.update(schema.User, { id: userAddress })
@@ -526,8 +552,8 @@ ponder.on("LendingPool:BorrowDebtCrosschain", async ({ event, context }) => {
   const borrowToken = poolTokens.borrowToken;
   
   // Get or create user and pool
-  let user = await getOrCreateUser(userAddress, context);
-  let pool = await getOrCreatePool(poolAddress, context);
+  const user = await getOrCreateUser(userAddress, context);
+  const pool = await getOrCreatePool(poolAddress, context);
   
   // Update user totals
   await context.db.update(schema.User, { id: userAddress })
@@ -581,8 +607,8 @@ ponder.on("LendingPool:RepayWithCollateralByPosition", async ({ event, context }
   const borrowToken = poolTokens.borrowToken;
   
   // Get or create user and pool
-  let user = await getOrCreateUser(userAddress, context);
-  let pool = await getOrCreatePool(poolAddress, context);
+  const user = await getOrCreateUser(userAddress, context);
+  const pool = await getOrCreatePool(poolAddress, context);
   
   // Update user totals
   await context.db.update(schema.User, { id: userAddress })
@@ -709,8 +735,8 @@ ponder.on("LendingPool:SwapToken", async ({ event, context }) => {
   const userAddress = event.args.user;
   
   // Get or create user and pool
-  let user = await getOrCreateUser(userAddress, context);
-  let pool = await getOrCreatePool(poolAddress, context);
+  const user = await getOrCreateUser(userAddress, context);
+  const pool = await getOrCreatePool(poolAddress, context);
 
   // Update user totals
   await context.db.update(schema.User, { id: userAddress })
@@ -764,7 +790,7 @@ console.log("💡 User positions update in real-time with each transaction!");
 // ========================================
 
 // Helper function to track swap transactions
-async function trackSwapTransaction(
+async function _trackSwapTransaction(
   userAddress: string,
   poolAddress: string,
   tokenFrom: string,
@@ -775,7 +801,7 @@ async function trackSwapTransaction(
   blockNumber: bigint,
   transactionHash: string,
   logIndex: number,
-  context: any
+  context: PonderContext
 ) {
   // Get or create user and pool
   await getOrCreateUser(userAddress, context);
@@ -797,80 +823,3 @@ async function trackSwapTransaction(
 
   console.log(`🔄 Swap tracked: ${userAddress} swapped ${amountIn.toString()} ${tokenFrom} for ${amountOut.toString()} ${tokenTo}`);
 }
-
-// ========================================
-// INSTRUCTIONS FOR ACTIVATING HANDLERS
-// ========================================
-
-/*
-USER POSITION TRACKING IMPLEMENTATION - FIXED:
-
-The system now tracks individual user positions with two main tables using CORRECT TOKEN ADDRESSES:
-
-1. UserCollateral:
-   - Tracks collateral amounts per user per pool per COLLATERAL TOKEN
-   - Updates when users supply/withdraw collateral
-   - Includes LTV ratios and health factors
-   - ID format: "user-pool-collateralTokenAddress"
-   - Asset field now contains the actual collateral token address
-
-2. UserBorrow:
-   - Tracks borrowed amounts per user per pool per BORROW TOKEN  
-   - Updates when users borrow or repay debt
-   - Includes accrued interest and current borrow rates
-   - ID format: "user-pool-borrowTokenAddress"
-   - Asset field now contains the actual borrow token address
-
-🔧 FIXED ISSUES:
-- Asset field no longer uses pool address as placeholder
-- Now correctly uses borrowToken from LendingPoolCreated table
-- Collateral tracking uses collateralToken from LendingPoolCreated table
-- Proper token separation for multi-asset pools
-
-Token Resolution Logic:
-1. First tries to get tokens from LendingPoolCreated table (most accurate)
-2. Falls back to pool.token0/token1 if available
-3. Ultimate fallback to pool address (for backward compatibility)
-
-Key Features:
-- Real-time position updates on every transaction
-- Interest accrual calculations per borrow token
-- Health factor monitoring across all user positions
-- Individual user debt tracking per token
-- Collateral utilization tracking per token
-
-Usage Examples:
-- Query total borrowed USDC for a user: UserBorrow where asset = USDC_ADDRESS
-- Check user's ETH collateral in a pool: UserCollateral where asset = ETH_ADDRESS  
-- Monitor health factors: calculated from both collateral and borrow positions
-- Track interest earned on specific token: accruedInterest field in UserBorrow
-
-The asset field now represents the actual token address being borrowed or used as collateral,
-enabling proper multi-asset tracking within each lending pool.
-
-TypeScript Error Fix Instructions:
-
-The handlers above may show TypeScript errors because Ponder needs to generate
-proper event types from the contract configuration. To fix this:
-
-1. Make sure ponder.config.ts LendingPool contract has:
-   - Correct ABI (LendingPoolAbi)
-   - All pool addresses in the address array
-   - Proper startBlock
-
-2. Restart the development server completely:
-   - Stop: Ctrl+C
-   - Start: pnpm dev
-
-3. Wait for historical sync to complete
-
-4. Uncomment handlers one by one and test
-
-5. If TypeScript errors persist, check that:
-   - Event names match exactly what's in the ABI
-   - Contract configuration is correct
-   - All pool addresses are valid
-
-The system is currently working with factory events and will show proper
-event registration in the indexing table once the handlers are properly typed.
-*/
