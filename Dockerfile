@@ -21,4 +21,4 @@ RUN pnpm run codegen
 EXPOSE 42069
 
 # Start the application
-CMD ["pnpm", "start"]
+CMD ["pnpm", "start", "--schema", "public"]
