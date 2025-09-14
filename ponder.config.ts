@@ -6,7 +6,7 @@ import { LendingPoolFactoryAbi } from "./abis/LendingPoolFactoryAbi";
 // Konfigurasi database berdasarkan environment
 const getDatabaseConfig = () => {
   // Connection string direct untuk write access (tanpa pooler)
-  const connectionString = "postgresql://postgres.zqpcdcaonwfthsapoygg:ucQKVTaBjPC9YFOX@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres";
+  const connectionString = "postgresql://postgres.dsebmvkyppgdsnbtbmns:ucQKVTaBjPC9YFOX@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres";
   
   // Untuk Railway/production, pastikan gunakan direct connection
   if (process.env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT ) {
@@ -43,7 +43,7 @@ export default createConfig({
       chain: "kaia",
       abi: LendingPoolFactoryAbi,
       address: "0xa971CD2714fbCc9A942b09BC391a724Df9338206",
-      startBlock:	95725118,
+      startBlock: 195725118,
       includeTransactionReceipts: true,
     },
     // Dynamic pool addresses using factory pattern
