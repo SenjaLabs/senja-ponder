@@ -1,5 +1,12 @@
 import { ponder } from "ponder:registry";
 import * as schema from "../ponder.schema";
+import { createPublicClient, http } from 'viem';
+import { LendingPoolAbi } from '../abis/LendingPoolAbi';
+
+// Setup client untuk query router address
+const client = createPublicClient({
+  transport: http('https://rpc.ankr.com/kaia')
+});
 
 // Helper function untuk membuat event ID
 function createEventID(blockNumber: bigint, logIndex: number): string {
@@ -15,7 +22,23 @@ ponder.on("LendingPoolFactory:LendingPoolCreated", async ({ event, context }) =>
   const borrowToken = event.args.borrowToken;
   const ltv = event.args.ltv;
   const factoryAddress = event.log.address;
+  const timestamp = BigInt(event.block.timestamp);
+  const blockNumber = BigInt(event.block.number);
   
+  // Query router address dari pool yang baru dibuat
+  let routerAddress: string | null = null;
+  try {
+    routerAddress = await client.readContract({
+      address: poolAddress as `0x${string}`,
+      abi: LendingPoolAbi,
+      functionName: 'router',
+    }) as string;
+    
+    console.log(`🤖 Router discovered for pool ${poolAddress}: ${routerAddress}`);
+  } catch (error) {
+    console.error(`❌ Failed to get router for pool ${poolAddress}:`, error);
+  }
+
   // Create atau update pool di database
   await context.db.insert(schema.LendingPool).values({
     id: poolAddress,
@@ -27,11 +50,25 @@ ponder.on("LendingPoolFactory:LendingPoolCreated", async ({ event, context }) =>
     totalWithdrawals: 0n,
     totalBorrows: 0n,
     totalRepays: 0n,
-    created: BigInt(event.block.timestamp),
+    created: timestamp,
   }).onConflictDoNothing(); // Jika sudah ada, jangan insert lagi
 
+  // Simpan mapping pool-to-router jika berhasil mendapatkan router
+  if (routerAddress) {
+    await context.db.insert(schema.PoolRouter).values({
+      id: poolAddress,
+      poolAddress: poolAddress,
+      routerAddress: routerAddress,
+      isActive: true,
+      discoveredAt: timestamp,
+      blockNumber: blockNumber,
+    }).onConflictDoNothing(); // Jika sudah ada, jangan replace
+    
+    console.log(`📝 Pool-Router mapping saved: ${poolAddress} -> ${routerAddress}`);
+  }
+
   // Catat event creation menggunakan schema yang ada
-  const eventId = createEventID(BigInt(event.block.number), event.log.logIndex);
+  const eventId = createEventID(blockNumber, event.log.logIndex);
   
   await context.db.insert(schema.LendingPoolCreated).values({
     id: eventId,
@@ -39,8 +76,8 @@ ponder.on("LendingPoolFactory:LendingPoolCreated", async ({ event, context }) =>
     collateralToken: collateralToken,
     borrowToken: borrowToken,
     ltv: ltv,
-    timestamp: BigInt(event.block.timestamp),
-    blockNumber: BigInt(event.block.number),
+    timestamp: timestamp,
+    blockNumber: blockNumber,
     transactionHash: event.transaction.hash,
   });
 
@@ -52,7 +89,7 @@ ponder.on("LendingPoolFactory:LendingPoolCreated", async ({ event, context }) =>
       id: factoryAddress,
       address: factoryAddress,
       totalPoolsCreated: 1n,
-      created: BigInt(event.block.timestamp),
+      created: timestamp,
     });
   } else {
     await context.db.update(schema.LendingPoolFactory, { id: factoryAddress })

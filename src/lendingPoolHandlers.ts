@@ -16,6 +16,9 @@ interface UserPositionData {
   user: string;
   pool: string;
   positionAddress: string;
+  isActive: boolean;
+  createdAt: bigint;
+  lastUpdated: bigint;
 }
 
 interface UserCollateralData {
@@ -122,30 +125,82 @@ async function getOrCreateUserBorrow(
   return userBorrow;
 }
 
+// Helper function to get or create user position 
+async function getOrCreateUserPosition(
+  userAddress: string,
+  poolAddress: string,
+  context: PonderContext,
+  timestamp: bigint
+): Promise<string | null> {
+  const userPositionId = `${userAddress}-${poolAddress}`;
+  
+  try {
+    // Try to find existing position
+    const userPosition = await context.db.find(schema.UserPosition, { id: userPositionId });
+    
+    if (userPosition && userPosition.isActive) {
+      console.log(`📍 Found existing position address for ${userAddress} in pool ${poolAddress}: ${userPosition.positionAddress}`);
+      return userPosition.positionAddress;
+    }
+    
+    // If no position found, this means position might be created automatically
+    // We'll return null and let the transaction create the position via CreatePosition event
+    console.log(`⚠️ No position found for ${userAddress} in pool ${poolAddress}, waiting for CreatePosition event`);
+    return null;
+    
+  } catch (error) {
+    console.log(`❌ Error getting/creating position address for ${userAddress}: ${error}`);
+    return null;
+  }
+}
+
 // Helper function to get user position address
-async function _getUserPositionAddress(
+async function getUserPositionAddress(
   userAddress: string,
   poolAddress: string,
   context: PonderContext
 ): Promise<string | null> {
   const userPositionId = `${userAddress}-${poolAddress}`;
-  const userPosition = await context.db.find(schema.UserPosition, { id: userPositionId });
-  return userPosition?.positionAddress || null;
+  
+  try {
+    const userPosition = await context.db.find(schema.UserPosition, { id: userPositionId });
+    
+    if (userPosition && userPosition.isActive) {
+      console.log(`📍 Found position address for ${userAddress} in pool ${poolAddress}: ${userPosition.positionAddress}`);
+      return userPosition.positionAddress;
+    }
+    
+    console.log(`⚠️ No active position found for ${userAddress} in pool ${poolAddress}`);
+    return null;
+  } catch (error) {
+    console.log(`❌ Error getting position address for ${userAddress}: ${error}`);
+    return null;
+  }
 }
 
 // Helper function to get all user positions
-async function _getAllUserPositions(
+async function getAllUserPositions(
   userAddress: string,
   context: PonderContext
-): Promise<Array<{ pool: string; positionAddress: string }>> {
-  const positions = await context.db.findMany(schema.UserPosition, {
-    where: { user: userAddress, isActive: true }
-  });
-  
-  return positions.map((pos: UserPositionData) => ({
-    pool: pos.pool,
-    positionAddress: pos.positionAddress,
-  }));
+): Promise<Array<{ pool: string; positionAddress: string; isActive: boolean; createdAt: bigint }>> {
+  try {
+    const positions = await context.db.findMany(schema.UserPosition, {
+      where: { user: userAddress }
+    });
+    
+    const result = positions.map((pos: UserPositionData) => ({
+      pool: pos.pool,
+      positionAddress: pos.positionAddress,
+      isActive: pos.isActive,
+      createdAt: pos.createdAt,
+    }));
+    
+    console.log(`📍 Found ${result.length} positions for user ${userAddress}`);
+    return result;
+  } catch (error) {
+    console.log(`❌ Error getting all positions for ${userAddress}: ${error}`);
+    return [];
+  }
 }
 
 async function updateUserCollateral(
@@ -299,6 +354,53 @@ async function _accrueUserInterest(
   }
 }
 
+// Helper function to calculate and update total liquidity
+async function updatePoolLiquidity(
+  poolAddress: string,
+  context: PonderContext
+) {
+  const pool = await context.db.find(schema.LendingPool, { id: poolAddress });
+  if (!pool) return;
+
+  // Calculate available liquidity (totalSupplyAssets - totalBorrowAssets)
+  const totalLiquidity = pool.totalSupplyAssets - pool.totalBorrowAssets;
+
+  await context.db.update(schema.LendingPool, { id: poolAddress })
+    .set({
+      totalLiquidity: totalLiquidity > 0n ? totalLiquidity : 0n,
+    });
+
+  console.log(`📊 Pool ${poolAddress} liquidity updated:`);
+  console.log(`   totalSupplyAssets: ${pool.totalSupplyAssets}`);
+  console.log(`   totalBorrowAssets: ${pool.totalBorrowAssets}`);
+  console.log(`   totalLiquidity: ${totalLiquidity > 0n ? totalLiquidity : 0n}`);
+}
+
+// Helper function to get pool liquidity data
+async function getPoolLiquidity(
+  poolAddress: string,
+  context: PonderContext
+): Promise<{
+  totalSupplyAssets: bigint;
+  totalBorrowAssets: bigint;
+  totalLiquidity: bigint;
+  utilizationRate: number;
+  supplyRate: number;
+  borrowRate: number;
+} | null> {
+  const pool = await context.db.find(schema.LendingPool, { id: poolAddress });
+  if (!pool) return null;
+
+  return {
+    totalSupplyAssets: pool.totalSupplyAssets,
+    totalBorrowAssets: pool.totalBorrowAssets,
+    totalLiquidity: pool.totalLiquidity,
+    utilizationRate: pool.utilizationRate,
+    supplyRate: pool.supplyRate,
+    borrowRate: pool.borrowRate,
+  };
+}
+
 async function updatePoolAPY(
   poolAddress: string, 
   context: PonderContext, 
@@ -333,11 +435,15 @@ async function updatePoolAPY(
   // Calculate accrued interest
   const accrual = analytics.calculateAccruedInterest();
 
+  // Calculate available liquidity (totalSupplyAssets - totalBorrowAssets)
+  const totalLiquidity = accrual.newSupplyAssets - accrual.newBorrowAssets;
+
   // Update pool with new rates and accrued interest
   await context.db.update(schema.LendingPool, { id: poolAddress })
     .set({
       totalSupplyAssets: accrual.newSupplyAssets,
       totalBorrowAssets: accrual.newBorrowAssets,
+      totalLiquidity: totalLiquidity > 0n ? totalLiquidity : 0n, // Ensure non-negative
       utilizationRate: analytics.utilizationRate,
       supplyRate: analytics.supplyRate,
       borrowRate: analytics.borrowRate,
@@ -455,44 +561,63 @@ async function getPoolTokens(poolAddress: string, context: PonderContext): Promi
 
 // SupplyLiquidity Event Handler
 ponder.on("LendingPool:SupplyLiquidity", async ({ event, context }) => {
+  console.log("💰 SupplyLiquidity event:", event.args);
+  
   const poolAddress = event.log.address;
   const userAddress = event.args.user;
+  const amount = BigInt(event.args.amount);
+  const shares = BigInt(event.args.shares);
+  const timestamp = BigInt(event.block.timestamp);
+  
+  // Get pool tokens to determine the correct asset
+  const poolTokens = await getPoolTokens(poolAddress, context);
+  // For supply liquidity, we typically supply the base/quote token
+  // This should be determined based on your protocol logic
+  const suppliedAsset = poolTokens.collateralToken; // or borrowToken depending on protocol
   
   // Get or create user and pool
   const user = await getOrCreateUser(userAddress, context);
   const pool = await getOrCreatePool(poolAddress, context);
   
+  // Try to get user position (might not exist yet if position is created in same transaction)
+  const positionAddress = await getUserPositionAddress(userAddress, poolAddress, context);
+  
   // Update user totals
   await context.db.update(schema.User, { id: userAddress })
     .set({
-      totalDeposited: user!.totalDeposited + BigInt(event.args.amount),
+      totalDeposited: user!.totalDeposited + amount,
     });
   
   // Update pool totals and assets/shares for APY calculation
   await context.db.update(schema.LendingPool, { id: poolAddress })
     .set({
-      totalDeposits: pool!.totalDeposits + BigInt(event.args.amount),
-      totalSupplyAssets: pool!.totalSupplyAssets + BigInt(event.args.amount),
-      totalSupplyShares: pool!.totalSupplyShares + BigInt(event.args.shares),
+      totalDeposits: pool!.totalDeposits + amount,
+      totalSupplyAssets: pool!.totalSupplyAssets + amount,
+      totalSupplyShares: pool!.totalSupplyShares + shares,
+      lastAccrued: timestamp, // Update last accrued time
     });
 
   // Update APY calculations
-  await updatePoolAPY(poolAddress, context, BigInt(event.block.timestamp), BigInt(event.block.number));
+  await updatePoolAPY(poolAddress, context, timestamp, BigInt(event.block.number));
+  
+  // Update pool liquidity
+  await updatePoolLiquidity(poolAddress, context);
 
   // Create SupplyLiquidity event record
   await context.db.insert(schema.SupplyLiquidity).values({
     id: createEventID(BigInt(event.block.number), event.log.logIndex!),
     user: userAddress,
     pool: poolAddress,
-    asset: poolAddress, // Use pool address as asset for now
-    amount: BigInt(event.args.amount),
+    asset: suppliedAsset, // Use the actual asset token, not pool address
+    amount: amount,
+    shares: shares,
     onBehalfOf: userAddress,
-    timestamp: BigInt(event.block.timestamp),
+    timestamp: timestamp,
     blockNumber: BigInt(event.block.number),
     transactionHash: event.transaction.hash,
   });
 
-  console.log(`✅ SupplyLiquidity processed: ${userAddress} supplied ${event.args.amount} to pool ${poolAddress}`);
+  console.log(`✅ SupplyLiquidity processed: ${userAddress} supplied ${amount.toString()} ${suppliedAsset} (${shares.toString()} shares) to pool ${poolAddress}${positionAddress ? ` (position: ${positionAddress})` : ''}`);
 });
 
 // 2. WithdrawLiquidity Event Handler
@@ -501,42 +626,57 @@ ponder.on("LendingPool:WithdrawLiquidity", async ({ event, context }) => {
   
   const poolAddress = event.log.address;
   const userAddress = event.args.user;
+  const amount = BigInt(event.args.amount);
+  const shares = BigInt(event.args.shares);
+  const timestamp = BigInt(event.block.timestamp);
+  
+  // Get pool tokens to determine the correct asset
+  const poolTokens = await getPoolTokens(poolAddress, context);
+  const withdrawnAsset = poolTokens.collateralToken; // or borrowToken depending on protocol
   
   // Get or create user and pool
   const user = await getOrCreateUser(userAddress, context);
   const pool = await getOrCreatePool(poolAddress, context);
   
+  // Try to get user position
+  const positionAddress = await getUserPositionAddress(userAddress, poolAddress, context);
+  
   // Update user totals
   await context.db.update(schema.User, { id: userAddress })
     .set({
-      totalWithdrawn: user!.totalWithdrawn + BigInt(event.args.amount),
+      totalWithdrawn: user!.totalWithdrawn + amount,
     });
   
   // Update pool totals and assets/shares for APY calculation
   await context.db.update(schema.LendingPool, { id: poolAddress })
     .set({
-      totalWithdrawals: pool!.totalWithdrawals + BigInt(event.args.amount),
-      totalSupplyAssets: pool!.totalSupplyAssets - BigInt(event.args.amount),
-      totalSupplyShares: pool!.totalSupplyShares - BigInt(event.args.shares),
+      totalWithdrawals: pool!.totalWithdrawals + amount,
+      totalSupplyAssets: pool!.totalSupplyAssets > amount ? pool!.totalSupplyAssets - amount : 0n,
+      totalSupplyShares: pool!.totalSupplyShares > shares ? pool!.totalSupplyShares - shares : 0n,
+      lastAccrued: timestamp,
     });
 
   // Update APY calculations
-  await updatePoolAPY(poolAddress, context, BigInt(event.block.timestamp), BigInt(event.block.number));
+  await updatePoolAPY(poolAddress, context, timestamp, BigInt(event.block.number));
+  
+  // Update pool liquidity
+  await updatePoolLiquidity(poolAddress, context);
 
   // Create WithdrawLiquidity event record
   await context.db.insert(schema.WithdrawLiquidity).values({
     id: createEventID(BigInt(event.block.number), event.log.logIndex!),
     user: userAddress,
     pool: poolAddress,
-    asset: poolAddress,
-    amount: BigInt(event.args.amount),
+    asset: withdrawnAsset, // Use the actual asset token, not pool address
+    amount: amount,
+    shares: shares,
     to: userAddress,
-    timestamp: BigInt(event.block.timestamp),
+    timestamp: timestamp,
     blockNumber: BigInt(event.block.number),
     transactionHash: event.transaction.hash,
   });
 
-  console.log(`✅ WithdrawLiquidity processed: ${userAddress} withdrew ${event.args.amount} from pool ${poolAddress}`);
+  console.log(`✅ WithdrawLiquidity processed: ${userAddress} withdrew ${amount.toString()} ${withdrawnAsset} (${shares.toString()} shares) from pool ${poolAddress}${positionAddress ? ` (position: ${positionAddress})` : ''}`);
 });
 
 // 3. BorrowDebtCrosschain Event Handler
@@ -555,6 +695,9 @@ ponder.on("LendingPool:BorrowDebtCrosschain", async ({ event, context }) => {
   // Get or create user and pool
   const user = await getOrCreateUser(userAddress, context);
   const pool = await getOrCreatePool(poolAddress, context);
+  
+  // Get user position address for this pool
+  const positionAddress = await getUserPositionAddress(userAddress, poolAddress, context);
   
   // Update user totals
   await context.db.update(schema.User, { id: userAddress })
@@ -583,24 +726,26 @@ ponder.on("LendingPool:BorrowDebtCrosschain", async ({ event, context }) => {
     pool: poolAddress,
     asset: borrowToken, // Use the actual borrow token, not pool address
     amount: amount,
-    borrowRateMode: BigInt(event.args.chainId), // Using chainId as borrowRateMode
-    borrowRate: BigInt(event.args.addExecutorLzReceiveOption), // Using addExecutorLzReceiveOption as borrowRate
+    shares: BigInt(event.args.shares), // Add shares field
+    chainId: BigInt(event.args.chainId), // Use new field name
+    addExecutorLzReceiveOption: BigInt(event.args.addExecutorLzReceiveOption), // Use new field name
     onBehalfOf: userAddress,
     timestamp: timestamp,
     blockNumber: BigInt(event.block.number),
     transactionHash: event.transaction.hash,
   });
 
-  console.log(`✅ BorrowDebtCrosschain processed: ${userAddress} borrowed ${amount.toString()} ${borrowToken} from pool ${poolAddress}`);
+  console.log(`✅ BorrowDebtCrosschain processed: ${userAddress} borrowed ${amount.toString()} ${borrowToken} from pool ${poolAddress} (chainId: ${event.args.chainId}, shares: ${event.args.shares})${positionAddress ? ` (position: ${positionAddress})` : ''}`);
 });
 
-// 4. RepayWithCollateralByPosition Event Handler
+// 4. RepayByPosition Event Handler
 ponder.on("LendingPool:RepayByPosition", async ({ event, context }) => {
-  console.log("💰 RepayWithCollateralByPosition event:", event.args);
+  console.log("💰 RepayByPosition event:", event.args);
   
   const poolAddress = event.log.address;
   const userAddress = event.args.user;
   const amount = BigInt(event.args.amount);
+  const shares = BigInt(event.args.shares); // Now using the shares parameter from ABI
   const timestamp = BigInt(event.block.timestamp);
   
   // Get pool tokens to determine the correct borrow token
@@ -611,36 +756,44 @@ ponder.on("LendingPool:RepayByPosition", async ({ event, context }) => {
   const user = await getOrCreateUser(userAddress, context);
   const pool = await getOrCreatePool(poolAddress, context);
   
+  // Get user position address for this pool
+  const positionAddress = await getUserPositionAddress(userAddress, poolAddress, context);
+  
   // Update user totals
   await context.db.update(schema.User, { id: userAddress })
     .set({
       totalRepaid: user!.totalRepaid + amount,
     });
   
-  // Update pool totals
+  // Update pool totals - also update shares
   await context.db.update(schema.LendingPool, { id: poolAddress })
     .set({
       totalRepays: pool!.totalRepays + amount,
       totalBorrowAssets: pool!.totalBorrowAssets > amount ? pool!.totalBorrowAssets - amount : 0n,
+      totalBorrowShares: pool!.totalBorrowShares > shares ? pool!.totalBorrowShares - shares : 0n,
     });
 
   // Update user borrow position (reduce borrowed amount) with correct borrow token
   await updateUserBorrow(userAddress, poolAddress, borrowToken, amount, false, context, timestamp);
 
-  // Create RepayWithCollateralByPosition event record
+  // Update APY calculations
+  await updatePoolAPY(poolAddress, context, timestamp, BigInt(event.block.number));
+
+  // Create RepayByPosition event record
   await context.db.insert(schema.RepayWithCollateralByPosition).values({
     id: createEventID(BigInt(event.block.number), event.log.logIndex!),
     user: userAddress,
     pool: poolAddress,
     asset: borrowToken, // Use the actual borrow token, not pool address
     amount: amount,
+    shares: shares, // Add shares field from event
     repayer: userAddress,
     timestamp: timestamp,
     blockNumber: BigInt(event.block.number),
     transactionHash: event.transaction.hash,
   });
 
-  console.log(`✅ RepayWithCollateralByPosition processed: ${userAddress} repaid ${amount.toString()} ${borrowToken} to pool ${poolAddress}`);
+  console.log(`✅ RepayByPosition processed: ${userAddress} repaid ${amount.toString()} ${borrowToken} (${shares.toString()} shares) to pool ${poolAddress}${positionAddress ? ` (position: ${positionAddress})` : ''}`);
 });
 
 // 5. SupplyCollateral Event Handler
@@ -660,6 +813,9 @@ ponder.on("LendingPool:SupplyCollateral", async ({ event, context }) => {
   await getOrCreateUser(userAddress, context);
   await getOrCreatePool(poolAddress, context);
 
+  // Get user position address for this pool
+  const positionAddress = await getUserPositionAddress(userAddress, poolAddress, context);
+
   // Update user collateral position with the correct collateral token
   await updateUserCollateral(userAddress, poolAddress, collateralToken, amount, true, context, timestamp);
 
@@ -676,7 +832,7 @@ ponder.on("LendingPool:SupplyCollateral", async ({ event, context }) => {
     transactionHash: event.transaction.hash,
   });
 
-  console.log(`✅ SupplyCollateral processed: ${userAddress} supplied ${amount.toString()} ${collateralToken} collateral to pool ${poolAddress}`);
+  console.log(`✅ SupplyCollateral processed: ${userAddress} supplied ${amount.toString()} ${collateralToken} collateral to pool ${poolAddress}${positionAddress ? ` (position: ${positionAddress})` : ''}`);
 });
 
 // 6. CreatePosition Event Handler
@@ -686,6 +842,7 @@ ponder.on("LendingPool:CreatePosition", async ({ event, context }) => {
   const poolAddress = event.log.address;
   const userAddress = event.args.user;
   const positionAddress = event.args.positionAddress;
+  const timestamp = BigInt(event.block.timestamp);
   
   // Get or create user and pool
   await getOrCreateUser(userAddress, context);
@@ -697,7 +854,7 @@ ponder.on("LendingPool:CreatePosition", async ({ event, context }) => {
     user: userAddress,
     pool: poolAddress,
     positionAddress: positionAddress,
-    timestamp: BigInt(event.block.timestamp),
+    timestamp: timestamp,
     blockNumber: BigInt(event.block.number),
     transactionHash: event.transaction.hash,
   });
@@ -707,25 +864,29 @@ ponder.on("LendingPool:CreatePosition", async ({ event, context }) => {
   const existingPosition = await context.db.find(schema.UserPosition, { id: userPositionId });
   
   if (existingPosition) {
+    // Update existing position
     await context.db.update(schema.UserPosition, { id: userPositionId })
       .set({
         positionAddress: positionAddress,
         isActive: true,
-        lastUpdated: BigInt(event.block.timestamp),
+        lastUpdated: timestamp,
       });
+    console.log(`🔄 Updated existing position for ${userAddress} in pool ${poolAddress} with new address ${positionAddress}`);
   } else {
+    // Create new position mapping
     await context.db.insert(schema.UserPosition).values({
       id: userPositionId,
       user: userAddress,
       pool: poolAddress,
       positionAddress: positionAddress,
       isActive: true,
-      createdAt: BigInt(event.block.timestamp),
-      lastUpdated: BigInt(event.block.timestamp),
+      createdAt: timestamp,
+      lastUpdated: timestamp,
     });
+    console.log(`🆕 Created new position mapping for ${userAddress} in pool ${poolAddress} with address ${positionAddress}`);
   }
 
-  console.log(`✅ CreatePosition processed: ${userAddress} created position ${positionAddress} in pool ${poolAddress}`);
+  console.log(`✅ CreatePosition processed: ${userAddress} created/updated position ${positionAddress} in pool ${poolAddress}`);
 });
 
 // NOTE: SwapToken event is not available in the current LendingPool ABI

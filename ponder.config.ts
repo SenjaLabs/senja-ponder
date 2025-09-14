@@ -2,6 +2,7 @@ import { createConfig, factory } from "ponder";
 import { parseAbiItem } from "viem";
 import { LendingPoolAbi } from "./abis/LendingPoolAbi";
 import { LendingPoolFactoryAbi } from "./abis/LendingPoolFactoryAbi";
+import { LendingPoolRouterAbi } from "./abis/LendingPoolRouterAbi";
 
 // Konfigurasi database berdasarkan environment
 const getDatabaseConfig = () => {
@@ -55,6 +56,17 @@ export default createConfig({
         event: parseAbiItem("event LendingPoolCreated(address indexed collateralToken, address indexed borrowToken, address indexed lendingPool, uint256 ltv)"),
         parameter: "lendingPool",
       }),
+      startBlock: 195725118,
+      includeTransactionReceipts: true,
+    },
+    // LendingPoolRouter - router addresses yang ditemukan dari pools
+    LendingPoolRouter: {
+      chain: "kaia",
+      abi: LendingPoolRouterAbi,
+      address: [
+        "0xc9E5C37a9E4F8CC3C7A48E50c4aDEe830798f0Ec", // Router untuk pool 0xf9c899692c42b2f5fc598615dd529360d533e6ce
+        "0x3881F4B841160956B4e14aBfdc5e7c3403BA315F", // Router untuk pool 0xc4a40e5c52ad84e0796367282a6cfcac36ffcda9
+      ],
       startBlock: 195725118,
       includeTransactionReceipts: true,
     },

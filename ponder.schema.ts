@@ -14,6 +14,7 @@ export const LendingPool = onchainTable("LendingPool", (t) => ({
   // APY tracking fields
   totalSupplyAssets: t.bigint().notNull().default(0n),
   totalSupplyShares: t.bigint().notNull().default(0n),
+  totalLiquidity: t.bigint().notNull().default(0n), // Available liquidity (totalSupplyAssets - totalBorrowAssets)
   totalBorrowAssets: t.bigint().notNull().default(0n),
   totalBorrowShares: t.bigint().notNull().default(0n),
   utilizationRate: t.integer().notNull().default(0), // in basis points (0-10000)
@@ -57,6 +58,7 @@ export const SupplyLiquidity = onchainTable("SupplyLiquidity", (t) => ({
   pool: t.text().notNull(),
   asset: t.text().notNull(),
   amount: t.bigint().notNull(),
+  shares: t.bigint().notNull(), // Added shares field to match ABI
   onBehalfOf: t.text().notNull(),
   timestamp: t.bigint().notNull(),
   blockNumber: t.bigint().notNull(),
@@ -69,6 +71,7 @@ export const WithdrawLiquidity = onchainTable("WithdrawLiquidity", (t) => ({
   pool: t.text().notNull(),
   asset: t.text().notNull(),
   amount: t.bigint().notNull(),
+  shares: t.bigint().notNull(), // Added shares field to match ABI
   to: t.text().notNull(),
   timestamp: t.bigint().notNull(),
   blockNumber: t.bigint().notNull(),
@@ -81,8 +84,9 @@ export const BorrowDebtCrosschain = onchainTable("BorrowDebtCrosschain", (t) => 
   pool: t.text().notNull(),
   asset: t.text().notNull(),
   amount: t.bigint().notNull(),
-  borrowRateMode: t.bigint().notNull(),
-  borrowRate: t.bigint().notNull(),
+  shares: t.bigint().notNull(), // Added shares field to match ABI
+  chainId: t.bigint().notNull(), // Renamed from borrowRateMode for clarity
+  addExecutorLzReceiveOption: t.bigint().notNull(), // Renamed from borrowRate for clarity
   onBehalfOf: t.text().notNull(),
   timestamp: t.bigint().notNull(),
   blockNumber: t.bigint().notNull(),
@@ -95,6 +99,7 @@ export const RepayWithCollateralByPosition = onchainTable("RepayWithCollateralBy
   pool: t.text().notNull(),
   asset: t.text().notNull(),
   amount: t.bigint().notNull(),
+  shares: t.bigint().notNull(), // Added shares field to match ABI
   repayer: t.text().notNull(),
   timestamp: t.bigint().notNull(),
   blockNumber: t.bigint().notNull(),
@@ -204,4 +209,40 @@ export const UserBorrow = onchainTable("UserBorrow", (t) => ({
   lastAccrued: t.bigint().notNull(),
   lastUpdated: t.bigint().notNull(),
   createdAt: t.bigint().notNull(),
+}));
+
+// ========================================
+// ROUTER EVENT TABLES
+// ========================================
+
+// Pool to Router Mapping untuk dynamic discovery
+export const PoolRouter = onchainTable("PoolRouter", (t) => ({
+  id: t.text().primaryKey(), // poolAddress
+  poolAddress: t.text().notNull(),
+  routerAddress: t.text().notNull(),
+  isActive: t.boolean().notNull().default(true),
+  discoveredAt: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+}));
+
+// Emergency Position Reset Event
+export const EmergencyPositionReset = onchainTable("EmergencyPositionReset", (t) => ({
+  id: t.text().primaryKey(),
+  user: t.text().notNull(),
+  router: t.text().notNull(),
+  timestamp: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+  transactionHash: t.text().notNull(),
+}));
+
+// Position Liquidated Event
+export const PositionLiquidated = onchainTable("PositionLiquidated", (t) => ({
+  id: t.text().primaryKey(),
+  user: t.text().notNull(),
+  router: t.text().notNull(),
+  sharesRemoved: t.bigint().notNull(),
+  debtRepaid: t.bigint().notNull(),
+  timestamp: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+  transactionHash: t.text().notNull(),
 }));
