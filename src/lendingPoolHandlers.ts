@@ -583,8 +583,8 @@ ponder.on("LendingPool:BorrowDebtCrosschain", async ({ event, context }) => {
     pool: poolAddress,
     asset: borrowToken, // Use the actual borrow token, not pool address
     amount: amount,
-    borrowRateMode: BigInt(event.args.chainId), // Using chainId as borrowRateMode for now
-    borrowRate: BigInt(event.args.bridgeTokenSender), // Using bridgeTokenSender as borrowRate for now
+    borrowRateMode: BigInt(event.args.chainId), // Using chainId as borrowRateMode
+    borrowRate: BigInt(event.args.addExecutorLzReceiveOption), // Using addExecutorLzReceiveOption as borrowRate
     onBehalfOf: userAddress,
     timestamp: timestamp,
     blockNumber: BigInt(event.block.number),
@@ -595,7 +595,7 @@ ponder.on("LendingPool:BorrowDebtCrosschain", async ({ event, context }) => {
 });
 
 // 4. RepayWithCollateralByPosition Event Handler
-ponder.on("LendingPool:RepayWithCollateralByPosition", async ({ event, context }) => {
+ponder.on("LendingPool:RepayByPosition", async ({ event, context }) => {
   console.log("💰 RepayWithCollateralByPosition event:", event.args);
   
   const poolAddress = event.log.address;
@@ -728,6 +728,9 @@ ponder.on("LendingPool:CreatePosition", async ({ event, context }) => {
   console.log(`✅ CreatePosition processed: ${userAddress} created position ${positionAddress} in pool ${poolAddress}`);
 });
 
+// NOTE: SwapToken event is not available in the current LendingPool ABI
+// Commenting out this handler until the event is added to the contract
+/*
 // 7. SwapToken Event Handler
 ponder.on("LendingPool:SwapToken", async ({ event, context }) => {
   console.log("🔄 SwapToken event:", event.args);
@@ -767,24 +770,8 @@ ponder.on("LendingPool:SwapToken", async ({ event, context }) => {
 
   console.log(`✅ SwapToken processed: ${userAddress} swapped ${event.args.amountIn} ${event.args.tokenFrom} for ${event.args.amountOut} ${event.args.tokenTo} in pool ${poolAddress}`);
 });
+*/
 
-console.log("🚀 LendingPool event handlers loaded and ACTIVE!");
-console.log("📋 All handlers are now enabled and ready to index events:");
-console.log("   - SupplyLiquidity 🏦 ✅ ACTIVE");
-console.log("   - WithdrawLiquidity 🏧 ✅ ACTIVE");
-console.log("   - BorrowDebtCrosschain 🌉 ✅ ACTIVE (with correct borrow token tracking)");
-console.log("   - RepayWithCollateralByPosition 💰 ✅ ACTIVE (with correct borrow token tracking)");
-console.log("   - SupplyCollateral 🔒 ✅ ACTIVE (with correct collateral token tracking)");
-console.log("   - CreatePosition 📍 ✅ ACTIVE");
-console.log("   - SwapToken 🔄 ✅ ACTIVE");
-console.log("🎯 TypeScript errors are expected but handlers will work!");
-console.log("🔥 All events will now be indexed and stored in database!");
-console.log("📊 NEW: Individual user positions are now tracked with CORRECT TOKENS!");
-console.log("   - UserCollateral: tracks collateral per user per pool per COLLATERAL TOKEN");
-console.log("   - UserBorrow: tracks borrowed amounts per user per pool per BORROW TOKEN");
-console.log("   - Asset field now points to actual token addresses, not pool addresses");
-console.log("   - Health factors and interest accrual calculated");
-console.log("💡 User positions update in real-time with each transaction!");
 
 // ========================================
 // SWAP TRACKING FUNCTIONALITY

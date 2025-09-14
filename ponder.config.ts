@@ -1,6 +1,5 @@
 import { createConfig, factory } from "ponder";
 import { parseAbiItem } from "viem";
-
 import { LendingPoolAbi } from "./abis/LendingPoolAbi";
 import { LendingPoolFactoryAbi } from "./abis/LendingPoolFactoryAbi";
 
@@ -34,29 +33,29 @@ const getDatabaseConfig = () => {
 export default createConfig({
   database: getDatabaseConfig(),
   chains: {
-    base: {
-      id: 84532,
-      rpc: "wss://base-sepolia-rpc.publicnode.com",
+    kaia: {
+      id: 8217,
+      rpc: "https://rpc.ankr.com/kaia",
     },
   },
   contracts: {
     LendingPoolFactory: {
-      chain: "base",
+      chain: "kaia",
       abi: LendingPoolFactoryAbi,
-      address: "0x31c3850D2cBDC5B084D632d1c61d54161790bFF8",
-      startBlock: 30396548,
+      address: "0xa971CD2714fbCc9A942b09BC391a724Df9338206",
+      startBlock:	95725118,
       includeTransactionReceipts: true,
     },
     // Dynamic pool addresses using factory pattern
     LendingPool: {
-      chain: "base",
+      chain: "kaia",
       abi: LendingPoolAbi,
       address: factory({
-        address: "0x31c3850D2cBDC5B084D632d1c61d54161790bFF8",
+        address: "0xa971CD2714fbCc9A942b09BC391a724Df9338206",
         event: parseAbiItem("event LendingPoolCreated(address indexed collateralToken, address indexed borrowToken, address indexed lendingPool, uint256 ltv)"),
         parameter: "lendingPool",
       }),
-      startBlock: 30396548,
+      startBlock: 195725118,
       includeTransactionReceipts: true,
     },
   },
