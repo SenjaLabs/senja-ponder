@@ -1,3 +1,29 @@
 {
-  "extends": "ponder"
+  "extends": ["ponder"],
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    ".ponder/",
+    "generated/",
+    "dist/",
+    "build/",
+    "*.d.ts"
+  ],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": ["warn", { 
+      "argsIgnorePattern": "^_", 
+      "varsIgnorePattern": "^_",
+      "ignoreRestSiblings": true 
+    }],
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/ban-ts-comment": "warn",
+    "prefer-const": "warn"
+  }
 }

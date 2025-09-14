@@ -1,13 +1,12 @@
 import { createConfig, factory } from "ponder";
 import { parseAbiItem } from "viem";
-
 import { LendingPoolAbi } from "./abis/LendingPoolAbi";
 import { LendingPoolFactoryAbi } from "./abis/LendingPoolFactoryAbi";
 
 // Konfigurasi database berdasarkan environment
 const getDatabaseConfig = () => {
   // Connection string direct untuk write access (tanpa pooler)
-  let connectionString = "postgresql://postgres.zqpcdcaonwfthsapoygg:ucQKVTaBjPC9YFOX@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres";
+  const connectionString = "postgresql://postgres.dsebmvkyppgdsnbtbmns:ucQKVTaBjPC9YFOX@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres";
   
   // Untuk Railway/production, pastikan gunakan direct connection
   if (process.env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT ) {
@@ -34,29 +33,29 @@ const getDatabaseConfig = () => {
 export default createConfig({
   database: getDatabaseConfig(),
   chains: {
-    base: {
-      id: 8453,
-      rpc: "wss://base-rpc.publicnode.com",
+    kaia: {
+      id: 8217,
+      rpc: "https://rpc.ankr.com/kaia",
     },
   },
   contracts: {
     LendingPoolFactory: {
-      chain: "base",
+      chain: "kaia",
       abi: LendingPoolFactoryAbi,
-      address: "0x67165C24A886AAAf1bFA81934e44a2063c6B608C",
-      startBlock: 34979177,
+      address: "0xa971CD2714fbCc9A942b09BC391a724Df9338206",
+      startBlock: 195725118,
       includeTransactionReceipts: true,
     },
     // Dynamic pool addresses using factory pattern
     LendingPool: {
-      chain: "base",
+      chain: "kaia",
       abi: LendingPoolAbi,
       address: factory({
-        address: "0x67165C24A886AAAf1bFA81934e44a2063c6B608C",
+        address: "0xa971CD2714fbCc9A942b09BC391a724Df9338206",
         event: parseAbiItem("event LendingPoolCreated(address indexed collateralToken, address indexed borrowToken, address indexed lendingPool, uint256 ltv)"),
         parameter: "lendingPool",
       }),
-      startBlock: 34979177,
+      startBlock: 195725118,
       includeTransactionReceipts: true,
     },
   },

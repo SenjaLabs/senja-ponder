@@ -12,8 +12,10 @@
     "db": "ponder db",
     "db:migrate": "dotenv -e .env.production -- ponder db",
     "codegen": "ponder codegen",
-    "lint": "eslint .",
-    "typecheck": "tsc"
+    "lint": "eslint src/ scripts/ ponder.config.ts ponder.schema.ts --ext .ts,.js",
+    "lint:fix": "eslint src/ scripts/ ponder.config.ts ponder.schema.ts --ext .ts,.js --fix",
+    "typecheck": "tsc --noEmit",
+    "check": "pnpm typecheck && pnpm lint"
   },
   "dependencies": {
     "@types/pg": "^8.15.5",

@@ -1,6 +1,5 @@
 import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
-import { LendingPoolFactoryAbi } from '../abis/LendingPoolFactoryAbi';
 
 // Setup client untuk Base chain
 const client = createPublicClient({
