@@ -126,11 +126,11 @@ async function getOrCreateUserBorrow(
 }
 
 // Helper function to get or create user position 
-async function getOrCreateUserPosition(
+async function _getOrCreateUserPosition(
   userAddress: string,
   poolAddress: string,
   context: PonderContext,
-  timestamp: bigint
+  _timestamp: bigint
 ): Promise<string | null> {
   const userPositionId = `${userAddress}-${poolAddress}`;
   
@@ -179,7 +179,7 @@ async function getUserPositionAddress(
 }
 
 // Helper function to get all user positions
-async function getAllUserPositions(
+async function _getAllUserPositions(
   userAddress: string,
   context: PonderContext
 ): Promise<Array<{ pool: string; positionAddress: string; isActive: boolean; createdAt: bigint }>> {
@@ -377,7 +377,7 @@ async function updatePoolLiquidity(
 }
 
 // Helper function to get pool liquidity data
-async function getPoolLiquidity(
+async function _getPoolLiquidity(
   poolAddress: string,
   context: PonderContext
 ): Promise<{
