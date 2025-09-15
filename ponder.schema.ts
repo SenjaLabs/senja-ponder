@@ -18,6 +18,8 @@ export const LendingPool = onchainTable("LendingPool", (t) => ({
   totalBorrowAssets: t.bigint().notNull().default(0n),
   totalBorrowShares: t.bigint().notNull().default(0n),
   utilizationRate: t.integer().notNull().default(0), // in basis points (0-10000)
+  supplyAPY: t.integer().notNull().default(0), // in basis points (1% = 100)
+  borrowAPY: t.integer().notNull().default(0), // in basis points (1% = 100)
   supplyRate: t.integer().notNull().default(0), // in basis points per year
   borrowRate: t.integer().notNull().default(0), // in basis points per year
   lastAccrued: t.bigint().notNull().default(0n),
@@ -113,6 +115,18 @@ export const SupplyCollateral = onchainTable("SupplyCollateral", (t) => ({
   asset: t.text().notNull(),
   amount: t.bigint().notNull(),
   onBehalfOf: t.text().notNull(),
+  timestamp: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+  transactionHash: t.text().notNull(),
+}));
+
+export const WithdrawCollateral = onchainTable("WithdrawCollateral", (t) => ({
+  id: t.text().primaryKey(),
+  user: t.text().notNull(),
+  pool: t.text().notNull(),
+  asset: t.text().notNull(),
+  amount: t.bigint().notNull(),
+  to: t.text().notNull(),
   timestamp: t.bigint().notNull(),
   blockNumber: t.bigint().notNull(),
   transactionHash: t.text().notNull(),

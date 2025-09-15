@@ -430,6 +430,8 @@ async function updatePoolAPY(
 
   console.log(`   borrowRate: ${analytics.borrowRate}`);
   console.log(`   supplyRate: ${analytics.supplyRate}`);
+  console.log(`   borrowAPY: ${analytics.borrowAPY}`);
+  console.log(`   supplyAPY: ${analytics.supplyAPY}`);
   console.log(`   utilizationRate: ${analytics.utilizationRate}`);
 
   // Calculate accrued interest
@@ -445,6 +447,8 @@ async function updatePoolAPY(
       totalBorrowAssets: accrual.newBorrowAssets,
       totalLiquidity: totalLiquidity > 0n ? totalLiquidity : 0n, // Ensure non-negative
       utilizationRate: analytics.utilizationRate,
+      supplyAPY: analytics.supplyAPY,
+      borrowAPY: analytics.borrowAPY,
       supplyRate: analytics.supplyRate,
       borrowRate: analytics.borrowRate,
       lastAccrued: timestamp,
@@ -834,6 +838,46 @@ ponder.on("LendingPool:SupplyCollateral", async ({ event, context }) => {
 
   console.log(`✅ SupplyCollateral processed: ${userAddress} supplied ${amount.toString()} ${collateralToken} collateral to pool ${poolAddress}${positionAddress ? ` (position: ${positionAddress})` : ''}`);
 });
+
+// 5.1. WithdrawCollateral Event Handler
+// ponder.on("LendingPool:WithdrawCollateral", async ({ event, context }) => {
+//   console.log("🔓 WithdrawCollateral event:", event.args);
+  
+//   const poolAddress = event.log.address;
+//   const userAddress = event.args.user;
+//   const to = event.args.to;
+//   const amount = BigInt(event.args.amount);
+//   const timestamp = BigInt(event.block.timestamp);
+  
+//   // Get pool tokens to determine the correct collateral token
+//   const poolTokens = await getPoolTokens(poolAddress, context);
+//   const collateralToken = poolTokens.collateralToken;
+  
+//   // Get or create user and pool
+//   await getOrCreateUser(userAddress, context);
+//   await getOrCreatePool(poolAddress, context);
+
+//   // Get user position address for this pool
+//   const positionAddress = await getUserPositionAddress(userAddress, poolAddress, context);
+
+//   // Update user collateral position with the correct collateral token (subtract amount)
+//   await updateUserCollateral(userAddress, poolAddress, collateralToken, amount, false, context, timestamp);
+
+//   // Create WithdrawCollateral event record
+//   await context.db.insert(schema.WithdrawCollateral).values({
+//     id: createEventID(BigInt(event.block.number), event.log.logIndex!),
+//     user: userAddress,
+//     pool: poolAddress,
+//     asset: collateralToken, // Use the actual collateral token, not pool address
+//     amount: amount,
+//     to: to,
+//     timestamp: timestamp,
+//     blockNumber: BigInt(event.block.number),
+//     transactionHash: event.transaction.hash,
+//   });
+
+//   console.log(`✅ WithdrawCollateral processed: ${userAddress} withdrew ${amount.toString()} ${collateralToken} collateral from pool ${poolAddress} to ${to}${positionAddress ? ` (position: ${positionAddress})` : ''}`);
+// });
 
 // 6. CreatePosition Event Handler
 ponder.on("LendingPool:CreatePosition", async ({ event, context }) => {

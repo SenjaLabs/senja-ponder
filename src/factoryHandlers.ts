@@ -50,6 +50,19 @@ ponder.on("LendingPoolFactory:LendingPoolCreated", async ({ event, context }) =>
     totalWithdrawals: 0n,
     totalBorrows: 0n,
     totalRepays: 0n,
+    totalSwaps: 0n,
+    // APY tracking fields
+    totalSupplyAssets: 0n,
+    totalSupplyShares: 0n,
+    totalLiquidity: 0n,
+    totalBorrowAssets: 0n,
+    totalBorrowShares: 0n,
+    utilizationRate: 0,
+    supplyAPY: 0,
+    borrowAPY: 0,
+    supplyRate: 0,
+    borrowRate: 0,
+    lastAccrued: timestamp,
     created: timestamp,
   }).onConflictDoNothing(); // Jika sudah ada, jangan insert lagi
 
