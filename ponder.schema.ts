@@ -166,6 +166,44 @@ export const UserPosition = onchainTable("UserPosition", (t) => ({
   lastUpdated: t.bigint().notNull(),
 }));
 
+// Position Events - Events dari Position contract
+export const PositionWithdrawCollateral = onchainTable("PositionWithdrawCollateral", (t) => ({
+  id: t.text().primaryKey(),
+  user: t.text().notNull(),
+  positionAddress: t.text().notNull(),
+  pool: t.text().notNull(), // Pool address yang terkait dengan position
+  amount: t.bigint().notNull(),
+  timestamp: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+  transactionHash: t.text().notNull(),
+}));
+
+export const PositionSwapToken = onchainTable("PositionSwapToken", (t) => ({
+  id: t.text().primaryKey(),
+  user: t.text().notNull(),
+  positionAddress: t.text().notNull(),
+  pool: t.text().notNull(), // Pool address yang terkait dengan position
+  token: t.text().notNull(),
+  amount: t.bigint().notNull(),
+  timestamp: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+  transactionHash: t.text().notNull(),
+}));
+
+export const PositionSwapTokenByPosition = onchainTable("PositionSwapTokenByPosition", (t) => ({
+  id: t.text().primaryKey(),
+  user: t.text().notNull(),
+  positionAddress: t.text().notNull(),
+  pool: t.text().notNull(), // Pool address yang terkait dengan position
+  tokenIn: t.text().notNull(),
+  tokenOut: t.text().notNull(),
+  amountIn: t.bigint().notNull(),
+  amountOut: t.bigint().notNull(),
+  timestamp: t.bigint().notNull(),
+  blockNumber: t.bigint().notNull(),
+  transactionHash: t.text().notNull(),
+}));
+
 // APY and Interest Rate tracking
 export const PoolAPYSnapshot = onchainTable("PoolAPYSnapshot", (t) => ({
   id: t.text().primaryKey(), // poolAddress-timestamp

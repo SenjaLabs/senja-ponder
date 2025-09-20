@@ -3,11 +3,12 @@ import { parseAbiItem } from "viem";
 import { LendingPoolAbi } from "./abis/LendingPoolAbi";
 import { LendingPoolFactoryAbi } from "./abis/LendingPoolFactoryAbi";
 import { LendingPoolRouterAbi } from "./abis/LendingPoolRouterAbi";
+import { LendingPoolAbi as PositionAbi } from "./abis/PositionAbi";
 
 // Konfigurasi database berdasarkan environment
 const getDatabaseConfig = () => {
-  // Connection string direct untuk write access (tanpa pooler)
-  const connectionString = "postgresql://postgres.dsebmvkyppgdsnbtbmns:ucQKVTaBjPC9YFOX@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres";
+  // Ambil connection string dari environment variable
+  const connectionString = process.env.DATABASE_URL;
   
   // Untuk Railway/production, pastikan gunakan direct connection
   if (process.env.NODE_ENV === "production" || process.env.RAILWAY_ENVIRONMENT ) {
@@ -40,6 +41,7 @@ export default createConfig({
     },
   },
   contracts: {
+    // Factory contract untuk membuat pools secara dinamis
     LendingPoolFactory: {
       chain: "kaia",
       abi: LendingPoolFactoryAbi,
@@ -47,7 +49,7 @@ export default createConfig({
       startBlock: 195725118,
       includeTransactionReceipts: true,
     },
-    // Dynamic pool addresses using factory pattern
+    // Dynamic pool addresses menggunakan factory pattern - pools akan ditemukan otomatis
     LendingPool: {
       chain: "kaia",
       abi: LendingPoolAbi,
@@ -55,6 +57,23 @@ export default createConfig({
         address: "0xa971CD2714fbCc9A942b09BC391a724Df9338206",
         event: parseAbiItem("event LendingPoolCreated(address indexed collateralToken, address indexed borrowToken, address indexed lendingPool, uint256 ltv)"),
         parameter: "lendingPool",
+      }),
+      startBlock: 195725118,
+      includeTransactionReceipts: true,
+    },
+    // Dynamic Position addresses - menggunakan multiple pool addresses sebagai factories
+    Position: {
+      chain: "kaia", 
+      abi: PositionAbi,
+      address: factory({
+        // Multiple factories: semua pool addresses yang ada bisa menjadi factory untuk Position
+        address: [
+          "0xf9c899692c42b2f5fc598615dd529360d533e6ce", // Pool address 1
+          "0xc4a40e5c52ad84e0796367282a6cfcac36ffcda9", // Pool address 2
+          // Pool addresses baru akan ditambahkan secara manual di sini setelah ditemukan
+        ],
+        event: parseAbiItem("event CreatePosition(address user, address positionAddress)"),
+        parameter: "positionAddress",
       }),
       startBlock: 195725118,
       includeTransactionReceipts: true,
